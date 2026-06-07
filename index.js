@@ -1,70 +1,86 @@
-// @Technologicat's TODOs, early 2024:
-// TODO: Hotkeys (Tab to jump between chat branches matching a search).
+// @Technologicat 的 TODO，2024 年初：
+// TODO: 热键（例如 Tab 跳转到匹配搜索的聊天分支）。
 
-// @city-unit's original TODOs:
-// TODO Edge labels?
-// TODO Possible minimap mode
-// TODO More context menu options
-// TODO Experimental multi-tree view
-// TODO Mobile taps on iOS
+// @city-unit 原始 TODO：
+// TODO: 边标签。
+// TODO: 可能的小地图模式。
+// TODO: 更多上下文菜单选项。
+// TODO: 实验性多树视图。
+// TODO: iOS 移动端点击。
 
-/**
- * Loads an external file (CSS or JS) into the document's head.
- *
- * @param {string} src - The source URL or path to the file to load.
- * @param {string} type - The type of file to load. Accepted values are "css" or "js".
- * @param {Function} [callback] - Optional callback function to execute once the file is loaded (used only for JS files).
- */
-function loadFile(src, type, callback) {
-    var elem;
-
-    if (type === 'css') {
-        elem = document.createElement('link');
-        elem.rel = 'stylesheet';
-        elem.href = src;
-    } else if (type === 'js') {
-        elem = document.createElement('script');
-        elem.src = src;
-        elem.onload = function () {
-            if (callback) callback();
-        };
-    }
-
-    if (elem) {
-        document.head.appendChild(elem);
-    }
-}
-
-// Keep track of where your extension is located
 const extensionName = 'SillyTavern-Timelines';
+const settingsNamespace = 'SillyTavern-Timelines';
+const legacySettingsNamespace = 'timeline';
 const extensionFolderPath = `scripts/extensions/third-party/${extensionName}/`;
 
-// Load CSS file
-loadFile(`${extensionFolderPath}cytoscape-context-menus.min.css`, 'css');
-loadFile(`${extensionFolderPath}light.min.css`, 'css');
-loadFile(`${extensionFolderPath}material.min.css`, 'css');
-loadFile(`${extensionFolderPath}light-border.min.css`, 'css');
-loadFile(`${extensionFolderPath}translucent.min.css`, 'css');
-loadFile(`${extensionFolderPath}tippy.css`, 'css');
-loadFile(`${extensionFolderPath}tl_style.css`, 'css');
+/**
+ * 加载一个样式文件；如果已经加载过，就复用现有节点。
+ *
+ * @param {string} href - 样式文件路径。
+ */
+function loadStyle(href) {
+    if (document.querySelector(`link[data-timelines-asset="${href}"]`)) {
+        return;
+    }
 
-// Load JavaScript files
-loadFile('scripts/extensions/third-party/SillyTavern-Timelines/cytoscape.min.js', 'js');
-loadFile(`${extensionFolderPath}dagre.js`, 'js', function () {
-    loadFile(`${extensionFolderPath}cytoscape-dagre.min.js`, 'js');
+    const elem = document.createElement('link');
+    elem.rel = 'stylesheet';
+    elem.href = href;
+    elem.dataset.timelinesAsset = href;
+    document.head.appendChild(elem);
+}
+
+/**
+ * 顺序加载脚本，避免 Cytoscape 插件早于 Cytoscape 本体执行。
+ *
+ * @param {string} src - 脚本路径。
+ * @returns {Promise<void>} 脚本加载完成后 resolve。
+ */
+function loadScript(src) {
+    if (document.querySelector(`script[data-timelines-asset="${src}"]`)) {
+        return Promise.resolve();
+    }
+
+    return new Promise((resolve, reject) => {
+        const elem = document.createElement('script');
+        elem.src = src;
+        elem.dataset.timelinesAsset = src;
+        elem.onload = () => resolve();
+        elem.onerror = () => reject(new Error(`Timelines: 无法加载脚本 ${src}`));
+        document.head.appendChild(elem);
+    });
+}
+
+[
+    'vendor/cytoscape-context-menus.min.css',
+    'vendor/light.min.css',
+    'vendor/material.min.css',
+    'vendor/light-border.min.css',
+    'vendor/translucent.min.css',
+    'vendor/tippy.css',
+].forEach(path => loadStyle(`${extensionFolderPath}${path}`));
+
+let vendorLoadError = null;
+const vendorReady = (async () => {
+    await loadScript(`${extensionFolderPath}vendor/cytoscape.min.js`);
+    await loadScript(`${extensionFolderPath}vendor/dagre.js`);
+    await loadScript(`${extensionFolderPath}vendor/cytoscape-dagre.min.js`);
+    await loadScript(`${extensionFolderPath}vendor/tippy.umd.min.js`);
+    await loadScript(`${extensionFolderPath}vendor/cytoscape-popper.min.js`);
+    await loadScript(`${extensionFolderPath}vendor/cytoscape-context-menus.min.js`);
+})().catch(error => {
+    vendorLoadError = error;
+    console.error('Timelines: 第三方依赖加载失败。', error);
 });
-loadFile(`${extensionFolderPath}tippy.umd.min.js`, 'js', function () {
-    loadFile(`${extensionFolderPath}cytoscape-popper.min.js`, 'js');
-});
-loadFile(`${extensionFolderPath}cytoscape-context-menus.min.js`, 'js');
 
 import { extension_settings, getContext } from '../../../extensions.js';
 import { event_types, eventSource, saveSettingsDebounced } from '../../../../script.js';
 
-import { navigateToMessage, closeModal, closeTippy, handleModalDisplay, closeOpenDrawers } from './tl_utils.js';
-import { setupStylesAndData, highlightElements, restoreElements } from './tl_style.js';
-import { fetchData, prepareData } from './tl_node_data.js';
-import { toggleGraphOrientation, highlightNodesByQuery, makeQueryFragments, setGraphOrientationBasedOnViewport, getGraphOrientation } from './tl_graph.js';
+import { navigateToMessage, closeModal, closeTippy, handleModalDisplay, closeOpenDrawers } from './src/utils.js';
+import { setupStylesAndData, highlightElements, restoreElements } from './src/style.js';
+import { fetchData, prepareData } from './src/node-data.js';
+import { toggleGraphOrientation, highlightNodesByQuery, makeQueryFragments, setGraphOrientationBasedOnViewport, getGraphOrientation } from './src/graph.js';
+import { escapeHtml, escapeRegExp, makeContextKey } from './src/helpers.js';
 import { registerSlashCommand } from '../../../slash-commands.js';
 import { fixMarkdown } from '../../../power-user.js';
 import { hideLoader, showLoader } from '../../../loader.js';
@@ -100,72 +116,99 @@ let defaultSettings = {
     gpuAcceleration: true,
 };
 
-let currentlyHighlighted = null;  // selector for active legend item
-let lastContext = null;  // for tracking whether we need to refresh the graph
-let lastTimelineData = null;  // last fetched and prepared timeline data
-let theCy = null;  // Cytoscape instance
-let layout = {};  // Cytoscape graph layout configuration; populated later in `updateTimelineDataIfNeeded`
+let isLoadingSettings = false;
+let currentlyHighlighted = null;  // 当前高亮图例项对应的选择器
+let lastContextKey = null;  // 用来判断是否需要刷新图数据
+let lastTimelineData = null;  // 最近一次取回并整理好的时间线数据
+let theCy = null;  // Cytoscape 实例
+let layout = {};  // Cytoscape 图布局配置；稍后由 `updateTimelineDataIfNeeded` 填充
+let hasRegisteredContextInvalidators = false;
+let uiEventAbortController = null;
+let markdownConverter = null;
+let hasRegisteredCytoscapePlugins = false;
 
 /**
- * Asynchronously loads settings from `extension_settings.timeline`,
- * filling in with default settings if some are missing.
+ * 优先使用 Luker 的全局上下文；在旧版 SillyTavern 中回退到导入的 `getContext()`。
  *
- * After loading the settings, it also updates the UI elements
- * with the appropriate values from the loaded settings.
+ * @returns {object} Luker/ST 上下文。
+ */
+function getTimelinesContext() {
+    return window.Luker?.getContext?.() ?? getContext();
+}
+
+/**
+ * 取得并迁移 Timelines 设置。新命名空间为插件目录名，旧 `timeline` 作为兼容别名。
+ *
+ * @returns {object} Timelines 设置对象。
+ */
+function getTimelineSettings() {
+    if (!extension_settings[settingsNamespace]) {
+        extension_settings[settingsNamespace] = {
+            ...defaultSettings,
+            ...(extension_settings[legacySettingsNamespace] ?? {}),
+        };
+    }
+    extension_settings[legacySettingsNamespace] = extension_settings[settingsNamespace];
+    return extension_settings[settingsNamespace];
+}
+
+/**
+ * 从 Timelines 设置命名空间加载设置；缺失项用默认值补齐。
+ *
+ * 加载后同步更新设置面板控件。
  */
 async function loadSettings() {
-    // Ensure extension_settings.timeline exists
-    if (!extension_settings.timeline) {
-        console.info('Creating extension_settings.timeline');
-        extension_settings.timeline = {};
-    }
+    const settings = getTimelineSettings();
 
-    // Check and merge each default setting if it doesn't exist
     for (const [key, value] of Object.entries(defaultSettings)) {
-        if (!extension_settings.timeline.hasOwnProperty(key)) {
-            console.info(`Setting default for: ${key}`);
-            extension_settings.timeline[key] = value;
+        if (!Object.prototype.hasOwnProperty.call(settings, key)) {
+            console.info(`Timelines: 设置默认值 ${key}`);
+            settings[key] = value;
         }
     }
 
-    // Update UI elements
-    $('#tl_node_width').val(extension_settings.timeline.nodeWidth).trigger('input');
-    $('#tl_node_height').val(extension_settings.timeline.nodeHeight).trigger('input');
-    $('#tl_node_separation').val(extension_settings.timeline.nodeSeparation).trigger('input');
-    $('#tl_edge_separation').val(extension_settings.timeline.edgeSeparation).trigger('input');
-    $('#tl_rank_separation').val(extension_settings.timeline.rankSeparation).trigger('input');
-    $('#tl_spacing_factor').val(extension_settings.timeline.spacingFactor).trigger('input');
-    $('#tl_align').val(extension_settings.timeline.align).trigger('input');
-    $('#tl_tooltip_fixed').prop('checked', extension_settings.timeline.fixedTooltip).trigger('input');
-    $('#tl_hover_tooltip_fixed').prop('checked', extension_settings.timeline.fixedHoverTooltip).trigger('input');
-    $('#tl_gpu_acceleration').prop('checked', extension_settings.timeline.gpuAcceleration).trigger('input');
-    $('#tl_node_ranker').val(extension_settings.timeline.nodeRanker).trigger('input');
-    $('#tl_node_shape').val(extension_settings.timeline.nodeShape).trigger('input');
-    $('#tl_curve_style').val(extension_settings.timeline.curveStyle).trigger('input');
-    $('#tl_swipe_scale').prop('checked', extension_settings.timeline.swipeScale).trigger('input');
-    $('#tl_avatar_as_root').prop('checked', extension_settings.timeline.avatarAsRoot).trigger('input');
-    $('#tl_show_legend').prop('checked', extension_settings.timeline.showLegend).trigger('input');
-    $('#tl_use_chat_colors').prop('checked', extension_settings.timeline.useChatColors).trigger('input');
-    $('#tl_auto_expand_swipes').prop('checked', extension_settings.timeline.autoExpandSwipes).trigger('input');
-    $('#tl_zoom_current_chat').val(extension_settings.timeline.zoomToCurrentChatZoom).trigger('input');
-    $('#tl_zoom_min_cb').prop('checked', extension_settings.timeline.enableMinZoom).trigger('input');
-    $('#tl_zoom_min').val(extension_settings.timeline.minZoom).trigger('input');
-    $('#tl_zoom_min').prop("disabled", !extension_settings.timeline.enableMinZoom);
-    $('#tl_zoom_max_cb').prop('checked', extension_settings.timeline.enableMaxZoom).trigger('input');
-    $('#tl_zoom_max').val(extension_settings.timeline.maxZoom).trigger('input');
-    $('#tl_zoom_max').prop("disabled", !extension_settings.timeline.enableMaxZoom);
-    $('#bookmark-color-picker').attr('color', extension_settings.timeline.bookmarkColor);
-    $('#edge-color-picker').attr('color', extension_settings.timeline.edgeColor);
-    $('#user-node-color-picker').attr('color', extension_settings.timeline.userNodeColor);
-    $('#char-node-color-picker').attr('color', extension_settings.timeline.charNodeColor);
+    isLoadingSettings = true;
+    try {
+        $('#tl_node_width').val(settings.nodeWidth).trigger('input');
+        $('#tl_node_height').val(settings.nodeHeight).trigger('input');
+        $('#tl_node_separation').val(settings.nodeSeparation).trigger('input');
+        $('#tl_edge_separation').val(settings.edgeSeparation).trigger('input');
+        $('#tl_rank_separation').val(settings.rankSeparation).trigger('input');
+        $('#tl_spacing_factor').val(settings.spacingFactor).trigger('input');
+        $('#tl_align').val(settings.align).trigger('input');
+        $('#tl_tooltip_fixed').prop('checked', settings.fixedTooltip).trigger('input');
+        $('#tl_hover_tooltip_fixed').prop('checked', settings.fixedHoverTooltip).trigger('input');
+        $('#tl_gpu_acceleration').prop('checked', settings.gpuAcceleration).trigger('input');
+        $('#tl_node_ranker').val(settings.nodeRanker).trigger('input');
+        $('#tl_node_shape').val(settings.nodeShape).trigger('input');
+        $('#tl_curve_style').val(settings.curveStyle).trigger('input');
+        $('#tl_swipe_scale').prop('checked', settings.swipeScale).trigger('input');
+        $('#tl_avatar_as_root').prop('checked', settings.avatarAsRoot).trigger('input');
+        $('#tl_show_legend').prop('checked', settings.showLegend).trigger('input');
+        $('#tl_use_chat_colors').prop('checked', settings.useChatColors).trigger('input');
+        $('#tl_auto_expand_swipes').prop('checked', settings.autoExpandSwipes).trigger('input');
+        $('#tl_zoom_current_chat').val(settings.zoomToCurrentChatZoom).trigger('input');
+        $('#tl_zoom_min_cb').prop('checked', settings.enableMinZoom).trigger('input');
+        $('#tl_zoom_min').val(settings.minZoom).trigger('input');
+        $('#tl_zoom_min').prop('disabled', !settings.enableMinZoom);
+        $('#tl_zoom_max_cb').prop('checked', settings.enableMaxZoom).trigger('input');
+        $('#tl_zoom_max').val(settings.maxZoom).trigger('input');
+        $('#tl_zoom_max').prop('disabled', !settings.enableMaxZoom);
+        $('#bookmark-color-picker').attr('color', settings.bookmarkColor);
+        $('#edge-color-picker').attr('color', settings.edgeColor);
+        $('#user-node-color-picker').attr('color', settings.userNodeColor);
+        $('#char-node-color-picker').attr('color', settings.charNodeColor);
+    } finally {
+        isLoadingSettings = false;
+    }
 }
 
-let activeTapTippy = null;  // currently open full info panel instance
-let currentlyOpenNode = null;  // node whose full info panel instance it is
-let isTapTippyVisible = false;  // and whether it's open
+let activeTapTippy = null;  // 当前打开的完整信息面板实例
+let currentlyOpenNode = null;  // 当前完整信息面板所属的节点
+let isTapTippyVisible = false;  // 完整信息面板是否可见
 
 /*
- * Close the node full info panel, if it exists.
+ * 关闭节点完整信息面板。
  */
 function closeTapTippy() {
     if (activeTapTippy) {
@@ -245,7 +288,7 @@ function highlightTextSearchMatches(text) {
         //
         const fragments = makeQueryFragments(query, false);
         fragments.sort(function (a, b) { return b.length - a.length });
-        const regEx = new RegExp(`(${fragments.join('|')})`, "ig");
+        const regEx = new RegExp(`(${fragments.map(escapeRegExp).join('|')})`, "ig");
 
         // // This would be what to do in 'substring' search mode:
         // const regEx = new RegExp(query, "ig");
@@ -277,7 +320,7 @@ function makeTippy(ele, text, pos) {
         placements = { preferred: 'top' };  // to avoid covering nodes on the same timeline
     }
 
-    // We position the tooltip manually so it doesn't have a real target element.
+    // 手动定位 tooltip，因此它没有真实目标元素。
     const dummyDomEle = document.createElement('div');
 
     const tip = tippy(dummyDomEle, {
@@ -289,8 +332,8 @@ function makeTippy(ele, text, pos) {
 
             if (text) {
                 const mesDiv = document.createElement('div');
-                // The root node doesn't have a message, but only the AI character name(s), so it shouldn't have the `mes_text` class.
-                // This is needed to make the layouts of the Tippy and TapTippy for the root node identical.
+                // 根节点没有消息，只有 AI 角色名，因此不应使用 `mes_text` class。
+                // 这样可让根节点的 Tippy 与 TapTippy 布局一致。
                 if (ele.data('msg')) {
                     mesDiv.classList.add('mes_text');
                 }
@@ -304,27 +347,26 @@ function makeTippy(ele, text, pos) {
             let instructionText = '<small><i>';
             if (isNode) {
                 if (ele.data('id') === 'root') {
-                    instructionText += `This node represents the AI character${ele.data('name').includes(', ') ? 's' : ''} in this set of timelines.`;
+                    instructionText += `此节点代表这组时间线中的 AI 角色${String(ele.data('name') ?? '').includes(', ') ? '们' : ''}。`;
                 }
                 if (isSwipe) {
-                    instructionText += '<b>This node is a swipe.</b><br>';
+                    instructionText += '<b>此节点是一个 swipe。</b><br>';
                 }
                 if (ele.data('isBookmark')) {
-                    instructionText += `<b>There is a checkpoint at this node:</b><br>${ele.data('bookmarkName')}<br>`;
+                    instructionText += `<b>此节点有检查点：</b><br>${escapeHtml(ele.data('bookmarkName'))}<br>`;
                 }
                 if (ele.data('totalSwipes') > 0) {
-                    instructionText += '<b>This node has swipes.</b> Click and hold to toggle.<br>';
+                    instructionText += '<b>此节点有 swipes。</b>长按可切换显示。<br>';
                 }
                 if (ele.data('msg')) {
-                    instructionText += 'Click to open full info and actions.<br>';
-                    instructionText += 'Double-click to quick-open first matching chat.';
+                    instructionText += '点击打开完整信息和操作。<br>';
+                    instructionText += '双击快速打开第一个匹配的聊天。';
                 }
                 if (isSwipe) {
-                    instructionText += ('<br>If this swipe is not on the last message in the first matching chat, ' +
-                        'quick-open will create a new branch.');
+                    instructionText += '<br>如果此 swipe 不在第一个匹配聊天的最后一条消息上，快速打开会创建新分支。';
                 }
             } else {  // edge
-                instructionText += 'Click to follow edge.';
+                instructionText += '点击沿边跳转。';
             }
             instructionText += '</i></small>';
             instructionDiv.innerHTML = instructionText;
@@ -374,7 +416,7 @@ function makeNodeTippy(node) {
     };
 
     const truncatedMsg = formatNodeMessage(truncateMessage(node.data('msg')));
-    let content = node.data('name') ? `<b>${node.data('name')}</b> ${truncatedMsg}` : truncatedMsg;
+    let content = node.data('name') ? `<b>${escapeHtml(node.data('name'))}</b> ${truncatedMsg}` : truncatedMsg;
     content = highlightTextSearchMatches(content);
     const tippy = makeTippy(node, content);
     node._tippy = tippy;  // Store the tippy instance on the graph element (so we can hide it later)
@@ -414,14 +456,14 @@ function formatNodeMessage(mes) {
     // 5. Handling mathematical notation
     mes = mes.replaceAll('\\begin{align*}', '$$').replaceAll('\\end{align*}', '$$');
 
-    let converter = new showdown.Converter({
+    markdownConverter ??= new showdown.Converter({
         emoji: 'true',
         literalMidWordUnderscores: 'true',
         parseImgDimensions: 'true',
         tables: 'true',
     });
 
-    mes = converter.makeHtml(mes);
+    mes = markdownConverter.makeHtml(mes);
 
     // 7. Handle <code> tags
     // TODO: Does this ever trigger? We replace < > a the beginning with HTML entities.
@@ -459,7 +501,7 @@ function makeTapTippy(ele) {
     const isSwipe = Boolean(ele.data('isSwipe'));
     const placements = getNodeTippyPlacements(isSwipe);
 
-    // We position the tooltip manually so it doesn't have a real target element.
+    // 手动定位 tooltip，因此它没有真实目标元素。
     const dummyDomEle = document.createElement('div');
 
     const tip = tippy(dummyDomEle, {
@@ -476,7 +518,7 @@ function makeTapTippy(ele) {
                 { content: ele.data('send_date'), className: 'timestamp' },
             ];
             if (ele.data('totalSwipes') > 0) {
-                dataItems.push({ content: `Swipes: ${ele.data('totalSwipes')}`, className: 'timestamp' });
+                dataItems.push({ content: `Swipes：${ele.data('totalSwipes')}`, className: 'timestamp' });
             }
 
             // Build the HTML
@@ -485,7 +527,7 @@ function makeTapTippy(ele) {
             dataItems.forEach(dataItem => {
                 let p = document.createElement('div');
                 p.classList.add(dataItem.className);
-                p.innerHTML = dataItem.content;
+                p.textContent = dataItem.content ?? '';
                 div.appendChild(p);
             });
 
@@ -527,7 +569,7 @@ function makeTapTippy(ele) {
                             const chat_depth = ele.data('chat_depth');
                             const chat_sessions = ele.data('chat_sessions');
                             const isSwipe = ele.data('isSwipe');  // this only exists (and is `true`) on swipe nodes
-                            if (chat_depth === undefined || chat_sessions === undefined) {  // the root node doesn't have these
+                            if (chat_depth === undefined || chat_sessions === undefined) {  // 根节点没有这些数据
                                 return false;
                             }
                             if (chat_depth === (messageId + depthOffset) && !isSwipe && Object.keys(chat_sessions).includes(file_name)) {
@@ -565,7 +607,7 @@ function makeTapTippy(ele) {
                     prevBtn.classList.add('menu_button');
                     prevBtn.classList.add('widthNatural');
                     prevBtn.textContent = '<';  // ◀ triangle to the left
-                    prevBtn.title = `Zoom to previous message in "${sessionName}".`;  // TODO: data-i18n?
+                    prevBtn.title = `缩放到 "${sessionName}" 中的上一条消息。`;  // TODO: data-i18n?
                     const prevMessageSelector = makeTimelineNavigationMessageSelector(file_name, -1);
                     prevBtn.addEventListener('click', makeTimelineNavigationClickListener(prevMessageSelector));
                     if (isSwipe || messageId === 0) {
@@ -579,7 +621,7 @@ function makeTapTippy(ele) {
                     nextBtn.classList.add('menu_button');
                     nextBtn.classList.add('widthNatural');
                     nextBtn.textContent = '>';  // ▶ triangle to the right
-                    nextBtn.title = `Zoom to next message in "${sessionName}".`;  // TODO: data-i18n?
+                    nextBtn.title = `缩放到 "${sessionName}" 中的下一条消息。`;  // TODO: data-i18n?
                     const nextMessageSelector = makeTimelineNavigationMessageSelector(file_name, 1);
                     nextBtn.addEventListener('click', makeTimelineNavigationClickListener(nextMessageSelector));
                     if (isSwipe || isLastMessage) {
@@ -648,9 +690,9 @@ function makeTapTippy(ele) {
                 formattedMsg = formatNodeMessage(ele.data('msg'));
                 formattedMsg = highlightTextSearchMatches(formattedMsg);
             } else if (ele.data('id') === 'root') {
-                // The root node doesn't have a message, but only the AI character name(s), so it shouldn't have the `mes_text` class.
-                // This is needed to make the layouts of the Tippy and TapTippy for the root node identical.
-                formattedMsg = `<small><i>This node represents the AI character${ele.data('name').includes(', ') ? 's' : ''} in this set of timelines.</i></small>`;
+                // 根节点没有消息，只有 AI 角色名，因此不应使用 `mes_text` class。
+                // 这样可让根节点的 Tippy 与 TapTippy 布局一致。
+                formattedMsg = `<small><i>此节点代表这组时间线中的 AI 角色${String(ele.data('name') ?? '').includes(', ') ? '们' : ''}。</i></small>`;
             }
             mesDiv.innerHTML = formattedMsg;
             div.appendChild(mesDiv);
@@ -669,7 +711,7 @@ function makeTapTippy(ele) {
         },
         onHide() {
             isTapTippyVisible = false;
-            console.debug('Tap Tippy hidden');
+            console.debug('Timelines: 完整信息面板已隐藏。');
         },
         popperOptions: {
             modifiers: [
@@ -744,7 +786,7 @@ function createLegend(cy) {
         // If the color is defined and is not yet in the map
         if (color && !edgeColors.has(color)) {
             edgeColors.set(color, bookmarkName); // Set the color as key and bookmarkName as its value
-            createLegendItem(cy, legendContainer, { color, text: bookmarkName || `Path of ${color}`, colorKey: color }, 'line');
+            createLegendItem(cy, legendContainer, { color, text: bookmarkName || `${color} 的路径`, colorKey: color }, 'line');
         }
     });
 }
@@ -790,7 +832,7 @@ function createLegendItem(cy, container, item, type) {
         }
     });
 
-    // Click to lock/unlock the view
+    // 点击可锁定或解除锁定视图。
     legendItem.addEventListener('click', function () {
         const differentLegendItemClicked = Boolean(currentlyHighlighted !== selector);
 
@@ -802,7 +844,7 @@ function createLegendItem(cy, container, item, type) {
             currentlyHighlighted = selector;
         }
 
-        // Zoom to the highlighted elements (or zoom out if none)
+        // 缩放到高亮元素；没有高亮时缩放回全图。
         const [eles, padding] = filterElementsAndPad(cy, currentlyHighlighted);
         cy.stop().animate({
             fit: { eles: eles, padding: padding },
@@ -854,7 +896,7 @@ function resetLegendHighlight(cy) {
  *
  * @param {Object} cy - The Cytoscape instance.
  * @param {Object} selector - Anything `cy.filter` accepts. The thing(s) being zoomed to fit.
- *                            Use `undefined` to select the whole graph.
+ *                            使用 `undefined` 表示选择整张图。
  */
 function filterElementsAndPad(cy, selector) {
     let padding = 20;
@@ -937,13 +979,16 @@ function calculateFitZoom(cy, eles) {
 function initializeCytoscape(nodeData, styles) {
     let timelinesDiagramDiv = document.getElementById('timelinesDiagramDiv');
     if (!timelinesDiagramDiv) {
-        console.error('Unable to find element with id "timelinesDiagramDiv". Please ensure the element exists at the time of calling this function.');
+        console.error('Timelines: 找不到 id 为 "timelinesDiagramDiv" 的元素。请确认调用时该元素已经存在。');
         return null;
     }
 
-    cytoscape.use(cytoscapeDagre);
-    cytoscape.use(cytoscapeContextMenus);
-    cytoscape.use(cytoscapePopper);
+    if (!hasRegisteredCytoscapePlugins) {
+        cytoscape.use(cytoscapeDagre);
+        cytoscape.use(cytoscapeContextMenus);
+        cytoscape.use(cytoscapePopper);
+        hasRegisteredCytoscapePlugins = true;
+    }
 
     const cy = cytoscape({
         container: timelinesDiagramDiv,
@@ -983,7 +1028,7 @@ function getTooltipReference(ele, kind, pos) {
     if (fixedPosition) {
         // TODO: No idea why we need to wrap this into a function instead of just returning the bound method itself
         //       (maybe the query selector instance gets GC'd too early?), but there you have it.
-        return getFixedReferenceClientRect;  // Reference: zero-size div fixed at the bottom-left corner (see `timeline.html`)
+        return getFixedReferenceClientRect;  // 参考点：固定在左下角的零尺寸 div（见 `settings.html`）
     } else if (pos) {  // Manually specified position
         return () => ({
             width: 0,
@@ -1019,7 +1064,7 @@ function toggleSwipes(cy, visible) {
         swipeNodes.remove();
     }
 
-    if (visible === undefined) {  // New `visible` state not specified, toggle
+    if (visible === undefined) {  // 未指定新的 `visible` 状态时执行切换
         visible = !wasVisible;
     }
 
@@ -1042,8 +1087,11 @@ function toggleSwipes(cy, visible) {
  * @param {Object} cy - The Cytoscape instance.
  */
 function fixRootNodePosition(cy) {
-    console.debug('Timelines: fixing root node position.');
+    console.debug('Timelines: 正在修正根节点位置。');
     const rootNode = cy.elements('node[id="root"]')[0];  // array of matches -> take first one (there is only one!)
+    if (!rootNode) {
+        return;
+    }
     const outgoingEdgesFromRoot = cy.elements('edge[source="root"]');
     let greetingNodes = new Set(outgoingEdgesFromRoot.map(function (edge) {
         const nodeId = edge.data('target');
@@ -1051,7 +1099,10 @@ function fixRootNodePosition(cy) {
         const node = matchingNodes[0];
         return node;
     }));
-    greetingNodes = [...greetingNodes];  // set -> array
+    greetingNodes = [...greetingNodes].filter(Boolean);  // set -> array
+    if (greetingNodes.length === 0) {
+        return;
+    }
 
     function argMin(a) {
         return a.reduce((iBest, x, i, arr) => x < arr[iBest] ? i : iBest, 0);
@@ -1094,7 +1145,7 @@ function setupEventHandlers(cy, nodeData) {
     // Re-run the graph layout (needed whenever nodes are added/removed)
     function refreshLayout() {
         layout.fit = false;
-        const cyLayout = cy.elements().makeLayout(layout);  // TODO: Difference vs. `cy.layout(layout)` (see `setOrientation` in `tl_graph.js`)?
+        const cyLayout = cy.elements().makeLayout(layout);  // TODO: 与 `cy.layout(layout)` 的差异需要继续确认（见 `src/graph.js` 的 `setOrientation`）。
 
         cy.nodes().forEach(node => { node.unlock(); });
         cyLayout.run();  // apply the layout
@@ -1171,9 +1222,9 @@ function setupEventHandlers(cy, nodeData) {
         closeTapTippy();
 
         const query = textSearchElement.value.trim();  // A query consisting of only whitespace doesn't count.
-        const selector = highlightNodesByQuery(cy, query, 'fragments');  // -> selector function, or undefined if no match
+        const selector = highlightNodesByQuery(cy, query, 'fragments');  // 返回选择器函数；无匹配时返回 undefined
 
-        // Zoom to the matched elements (or zoom out if none)
+        // 缩放到匹配元素；没有匹配时缩放回全图。
         const [eles, padding] = filterElementsAndPad(cy, selector);
         cy.stop().animate({
             fit: { eles: eles, padding: padding },
@@ -1184,10 +1235,10 @@ function setupEventHandlers(cy, nodeData) {
     // The text search field is a garden-variety DOM element, so attach an event listener the classical way.
     textSearchElement.addEventListener('input', function (evt) {
         performTextSearch();
-    });
+    }, { signal: uiEventAbortController.signal });
     textSearchElement.addEventListener('focus', function (evt) {
         performTextSearch();
-    });
+    }, { signal: uiEventAbortController.signal });
 
     // Attach event listeners to toolbar buttons.
     let modal = document.getElementById('timelinesModal');
@@ -1275,7 +1326,7 @@ function setupEventHandlers(cy, nodeData) {
             x: evt.originalEvent.clientX,
             y: evt.originalEvent.clientY
         };
-        let tippy = makeTippy(edge, undefined, mousePos);  // no text content other than the automatic instruction
+        let tippy = makeTippy(edge, undefined, mousePos);  // 除自动说明外没有文本内容
         edge._tippy = tippy;  // Store the tippy instance on the graph element (so we can hide it later)
 
         showTimeout = setTimeout(() => { tippy.show(); }, 250);  // Delay the tooltip appearance by 250 ms
@@ -1335,7 +1386,7 @@ function setupEventHandlers(cy, nodeData) {
         }
         const thisNodeWasOpen = (node === currentlyOpenNode);
 
-        closeTapTippy();  // Close the previous full info panel, if any
+        closeTapTippy();  // 如有上一个完整信息面板，先关闭它。
         resetLegendHighlight(cy);  // Reset the legend highlight state
         restoreElements(cy);  // Remove remaining highlights, if any (from text search)
         highlightConnectedEdges(node);  // but keep the connected edge highlights
@@ -1368,7 +1419,7 @@ function setupEventHandlers(cy, nodeData) {
 
         // If ambiguous, show which chat file was selected
         if (chat_sessions.length > 1) {
-            toastr.info(`Multiple matches, auto-picked "${file_name}"`);
+            toastr.info(`找到多个匹配项，已自动选择 "${file_name}"`);
         }
 
         if (node.data('isSwipe')) {
@@ -1443,16 +1494,24 @@ function setupEventHandlers(cy, nodeData) {
         }
     });
 
-    // On certain chat events, null the lastContext, so that the graph refreshes at the next `updateTimelineDataIfNeeded`.
-    // TODO: Are there other events we should catch?
-    function clearLastContext() {
-        lastContext = null;
+    if (!hasRegisteredContextInvalidators) {
+        hasRegisteredContextInvalidators = true;
+
+        // 这些聊天事件会让缓存 key 失效，下次打开/刷新时重新取数据。
+        function clearLastContext() {
+            lastContextKey = null;
+        }
+        const context = getTimelinesContext();
+        const timelineEventSource = context.eventSource ?? eventSource;
+        const timelineEventTypes = context.eventTypes ?? context.event_types ?? event_types;
+        [
+            timelineEventTypes.CHARACTER_MESSAGE_RENDERED,
+            timelineEventTypes.USER_MESSAGE_RENDERED,
+            timelineEventTypes.CHAT_DELETED,
+            timelineEventTypes.CHAT_CHANGED,
+            timelineEventTypes.MESSAGE_SWIPED,
+        ].filter(Boolean).forEach(eventType => timelineEventSource.on(eventType, clearLastContext));
     }
-    eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, clearLastContext);
-    eventSource.on(event_types.USER_MESSAGE_RENDERED, clearLastContext);
-    eventSource.on(event_types.CHAT_DELETED, clearLastContext);
-    eventSource.on(event_types.CHATLOADED, clearLastContext);  // TODO: this seems wrong, no such constant?
-    eventSource.on(event_types.MESSAGE_SWIPED, clearLastContext);
 }
 
 /**
@@ -1463,6 +1522,13 @@ function setupEventHandlers(cy, nodeData) {
  * @param {Object} nodeData - The data used to render the nodes and edges of the Cytoscape diagram.
  */
 function renderCytoscapeDiagram(nodeData) {
+    if (theCy) {
+        theCy.destroy();
+        theCy = null;
+    }
+    uiEventAbortController?.abort();
+    uiEventAbortController = new AbortController();
+
     const styles = setupStylesAndData(nodeData);
     const cy = initializeCytoscape(nodeData, styles);
     if (cy) {
@@ -1485,8 +1551,9 @@ function renderCytoscapeDiagram(nodeData) {
  * @returns {Promise<boolean>} Returns true if the timeline data was updated, and false otherwise.
  */
 async function updateTimelineDataIfNeeded() {
-    const context = getContext();
-    if (!lastContext || lastContext.characterId !== context.characterId) {
+    const context = getTimelinesContext();
+    const contextKey = makeContextKey(context);
+    if (lastContextKey !== contextKey) {
         let data = {};
 
         if (!context.characterId) {  // group chat
@@ -1494,6 +1561,11 @@ async function updateTimelineDataIfNeeded() {
             if (groupID) {
                 // Send the group where the ID within the dict is equal to groupID
                 let group = context.groups.find(group => group.id === groupID);
+                if (!group?.chats?.length) {
+                    lastTimelineData = [];
+                    lastContextKey = contextKey;
+                    return true;
+                }
                 // For each `group.chats`, we add to a dict with the key being the index and the value being the chat
                 // (`prepareData` ignores the keys, it needs the values only)
                 for (let i = 0; i < group.chats.length; i++) {
@@ -1501,6 +1573,8 @@ async function updateTimelineDataIfNeeded() {
                     data[i] = { 'file_name': group.chats[i] };
                 }
                 lastTimelineData = await prepareData(data, true);
+            } else {
+                lastTimelineData = [];
             }
         }
         else {
@@ -1508,25 +1582,25 @@ async function updateTimelineDataIfNeeded() {
             lastTimelineData = await prepareData(data);
         }
 
-        lastContext = context; // Update `lastContext` to the current context
-        console.info('Timeline data updated');
+        lastContextKey = contextKey;
+        console.info('Timelines: 时间线数据已更新。');
 
         // https://github.com/cytoscape/cytoscape.js-dagre
         // https://js.cytoscape.org/#layouts
         layout = {
             name: 'dagre',
             nodeDimensionsIncludeLabels: true,
-            nodeSep: extension_settings.timeline.nodeSeparation,  // Separation between adjacent nodes in the same rank
-            edgeSep: extension_settings.timeline.edgeSeparation,  // Separation between adjacent edges in the same rank
-            rankSep: extension_settings.timeline.rankSeparation,  // Separation between each rank in the layout
-            rankDir: 'LR',  // 'TB' for top to bottom flow, 'LR' for left to right (this is toggled by `toggleGraphOrientation`)
-            ranker: extension_settings.timeline.nodeRanker,  // Algorithm to compute node rank: 'network-simplex', 'tight-tree', or 'longest-path'
-            spacingFactor: extension_settings.timeline.spacingFactor,  // Multiplicative factor (>0) to expand or compress the overall area that the nodes take up
-            acyclicer: 'greedy',  // 'greedy' or undefined. We shouldn't need an acyclicer, but let's be careful.
-            align: extension_settings.timeline.align,  // Alignment for rank nodes. Can be 'UL', 'UR', 'DL', or 'DR', where U = up, D = down, L = left, and R = right
-            sort: function (a, b) { return a.id() < b.id() },  // Layout tie-breaker: prefer the element that our `buildGraph` created first.
+            nodeSep: extension_settings.timeline.nodeSeparation,  // 同一层级中相邻节点之间的间距。
+            edgeSep: extension_settings.timeline.edgeSeparation,  // 同一层级中相邻边之间的间距。
+            rankSep: extension_settings.timeline.rankSeparation,  // 布局中各层级之间的间距。
+            rankDir: 'LR',  // 'TB' 为从上到下，'LR' 为从左到右；可由 `toggleGraphOrientation` 切换。
+            ranker: extension_settings.timeline.nodeRanker,  // 节点层级算法：'network-simplex'、'tight-tree' 或 'longest-path'。
+            spacingFactor: extension_settings.timeline.spacingFactor,  // 扩展或压缩节点整体占用区域的乘数（> 0）。
+            acyclicer: 'greedy',  // 使用贪心方式兜底避免环。
+            align: extension_settings.timeline.align,  // 层级节点对齐方式；可为 'UL'、'UR'、'DL' 或 'DR'。
+            sort: function (a, b) { return a.id().localeCompare(b.id()); },  // 布局并列时使用稳定 ID 排序。
         };
-        return true; // Data was updated
+        return true; // 数据已更新。
     }
     return false; // No update occurred
 }
@@ -1538,20 +1612,32 @@ async function updateTimelineDataIfNeeded() {
  */
 function zoomToCurrentChatNode(cy) {
     if (!cy) {
-        console.error('Timelines: no Cytoscape instance, cannot zoom to current chat node');
+        console.error('Timelines: 没有 Cytoscape 实例，无法缩放到当前聊天节点。');
         return;
     }
 
-    // Get latest chat message in currently open chat (TODO: special considerations for group chats?)
-    const context = getContext();
-    const chat = context.chat;
+    // 获取当前聊天的最后一条消息。
+    const context = getTimelinesContext();
+    const chat = Array.isArray(context.chat) ? context.chat : [];
+    if (chat.length === 0) {
+        console.info('Timelines: 当前聊天为空，跳过当前节点定位。');
+        return;
+    }
     const lastMessageId = chat.length - 1;
     const lastMessageObj = chat[lastMessageId];
+    if (!lastMessageObj?.mes) {
+        console.info('Timelines: 当前聊天最后一条消息没有文本，跳过当前节点定位。');
+        return;
+    }
     const mes = lastMessageObj.mes;
 
-    // On the graph, find the node containing that message text.
+    // 在图上查找包含该消息文本的节点。
     const selector = function (ele) { return ele.data('msg') === mes };
     const newCenterNode = cy.filter(selector);
+    if (newCenterNode.length === 0) {
+        console.info('Timelines: 图中没有找到当前聊天节点。');
+        return;
+    }
     resetLegendHighlight(cy);
 
     // Center and zoom in
@@ -1590,6 +1676,11 @@ async function onTimelineButtonClick() {
     let dataUpdated = false;
     try {
         showLoader();
+        await vendorReady;
+        if (vendorLoadError) {
+            toastr.error('Timelines: 第三方依赖加载失败，无法打开时间线。');
+            return;
+        }
         dataUpdated = await updateTimelineDataIfNeeded();
     }
     finally {
@@ -1626,7 +1717,7 @@ async function onTimelineButtonClick() {
  */
 function slashCommandHandler(_, reload) {
     if (reload == 'r') {
-        lastContext = null;
+        lastContextKey = null;
     }
     onTimelineButtonClick();
 }
@@ -1637,11 +1728,11 @@ function slashCommandHandler(_, reload) {
  * and sets up event handlers for user interactions.
  */
 jQuery(async () => {
-    const settingsHtml = await $.get(`${extensionFolderPath}/timeline.html`);
-    const getContainer = () => $(document.getElementById('timelines_container') ?? document.getElementById('extensions_settings'));
-    getContainer().append(settingsHtml);
+    const settingsHtml = await $.get(`${extensionFolderPath}settings.html`);
+    $('#timelines_container').remove();
+    $('#extensions_settings').append(settingsHtml);
     $('#show_timeline_view').on('click', onTimelineButtonClick);
-    registerSlashCommand('tl', slashCommandHandler, [], '/tl Show the timeline, "/tl r" to reload the graph', false, true);
+    registerSlashCommand('tl', slashCommandHandler, [], '/tl 显示时间线；"/tl r" 重新加载图', false, true);
 
     // Bind listeners to the specific inputs; format: {html_ui_id: name_in_default_settings, ...}
     const idsToSettingsMap = {
@@ -1696,7 +1787,8 @@ jQuery(async () => {
     });
 
     $('#resetSettingsBtn').click(function () {
-        extension_settings.timeline = Object.assign({}, defaultSettings);
+        extension_settings[settingsNamespace] = Object.assign({}, defaultSettings);
+        extension_settings[legacySettingsNamespace] = extension_settings[settingsNamespace];
         loadSettings();
         saveSettingsDebounced();
     });
@@ -1710,7 +1802,7 @@ jQuery(async () => {
 
 /**
  * Event handler function that is called when an input element's value is changed.
- * It updates the value in the `extension_settings.timeline` object based on the input element and the type of the input.
+ * 根据输入元素及其类型更新 Timelines 设置对象。
  *
  * @param {Object} element - The jQuery object representing the changed input element.
  * @param {string} settingName - The setting name corresponding to the changed input.
@@ -1732,7 +1824,7 @@ function onInputChange(element, settingName, rgbaValue = null) {
     const elementId = element.attr('id');
 
     // Enforce consistency between the various zoom settings
-    let otherSetting = undefined;  // for triggering a linked change on one other setting
+    let otherSetting = undefined;  // 用于触发另一个关联设置的变更
     if (elementId.includes('_zoom_')) {
         // enable/disable min/max sliders based on checkbox state
         if (elementId === 'tl_zoom_min_cb') {
@@ -1744,7 +1836,7 @@ function onInputChange(element, settingName, rgbaValue = null) {
             // This is better than changing zoomToCurrentChatZoom, because that was already enabled, but the min wasn't.
             if (enabled && (Number(extension_settings.timeline.minZoom) > Number(extension_settings.timeline.zoomToCurrentChatZoom))) {
                 otherSetting = $('#tl_zoom_min');
-                otherSetting.val(extension_settings.timeline.zoomToCurrentChatZoom);  // clamp *the other setting*
+                otherSetting.val(extension_settings.timeline.zoomToCurrentChatZoom);  // 夹紧另一个设置值
             }
         }
         if (elementId === 'tl_zoom_max_cb') {
@@ -1753,7 +1845,7 @@ function onInputChange(element, settingName, rgbaValue = null) {
 
             if (enabled && (Number(extension_settings.timeline.maxZoom) < Number(extension_settings.timeline.zoomToCurrentChatZoom))) {
                 otherSetting = $('#tl_zoom_max');
-                otherSetting.val(extension_settings.timeline.zoomToCurrentChatZoom);  // clamp *the other setting*
+                otherSetting.val(extension_settings.timeline.zoomToCurrentChatZoom);  // 夹紧另一个设置值
             }
         }
 
@@ -1775,7 +1867,7 @@ function onInputChange(element, settingName, rgbaValue = null) {
             }
             if (Number(value) > Number(extension_settings.timeline.zoomToCurrentChatZoom)) {
                 otherSetting = $('#tl_zoom_current_chat');
-                otherSetting.val(value);  // clamp *the other setting*
+                otherSetting.val(value);  // 夹紧另一个设置值
             }
         }
         if (elementId === 'tl_zoom_max') {  // clamp to min; change zoomToCurrentChatZoom if changing max would make it larger than new max
@@ -1785,7 +1877,7 @@ function onInputChange(element, settingName, rgbaValue = null) {
             }
             if (Number(value) < Number(extension_settings.timeline.zoomToCurrentChatZoom)) {
                 otherSetting = $('#tl_zoom_current_chat');
-                otherSetting.val(value);  // clamp *the other setting*
+                otherSetting.val(value);  // 夹紧另一个设置值
             }
         }
     }
@@ -1800,9 +1892,13 @@ function onInputChange(element, settingName, rgbaValue = null) {
         $(`#${elementId}_value`).text(displayValue);
     }
 
+    if (isLoadingSettings) {
+        return;
+    }
+
     // Update the actual setting
     extension_settings.timeline[settingName] = value;
-    lastContext = null; // Invalidate the last context to force a data update
+    lastContextKey = null; // 让下一次打开时间线时重新取数据
 
     // If changing this setting triggered a linked update on another setting, process it now.
     // We must do this *after* updating the actual settings object, so that one debounced save

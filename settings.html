@@ -1,0 +1,207 @@
+<div id="timelines_container" class="extension_container">
+    <div class="timeline-view-settings">
+        <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+            <b>Timelines</b>
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+        </div>
+        <div class="inline-drawer-content">
+            <div class="timeline-view-settings_block flex-container">
+                <label for="tl_hover_tooltip_fixed" title="始终在时间线视图左下角显示节点悬浮提示。关闭时，提示会显示在节点附近。" data-i18n="[title]始终在时间线视图左下角显示节点悬浮提示。关闭时，提示会显示在节点附近。">固定悬浮提示位置</label>
+                <input id="tl_hover_tooltip_fixed" type="checkbox" />
+            </div>
+            <div class="timeline-view-settings_block flex-container">
+                <label for="tl_tooltip_fixed" title="始终在时间线视图左下角显示节点完整信息面板。关闭时，面板会显示在节点附近。" data-i18n="[title]始终在时间线视图左下角显示节点完整信息面板。关闭时，面板会显示在节点附近。">固定完整信息面板位置</label>
+                <input id="tl_tooltip_fixed" type="checkbox" />
+            </div>
+            <div class="timeline-view-settings_block flex-container">
+                <label for="tl_gpu_acceleration" title="为点击节点时出现的完整信息面板启用 GPU 加速定位。如果提示箭头经常消失，关闭此项可能有帮助。" data-i18n="[title]为点击节点时出现的完整信息面板启用 GPU 加速定位。如果提示箭头经常消失，关闭此项可能有帮助。">完整信息面板 GPU 加速</label>
+                <input id="tl_gpu_acceleration" type="checkbox" />
+            </div>
+            <div class="timeline-view-settings_block flex-container">
+                <input value="样式设置" class="menu_button" type="submit" id="toggleStyleSettings" title="Timelines 图的视觉外观设置。" data-i18n="[title]Timelines 图的视觉外观设置。">
+            </div>
+            <!-- 可折叠的样式设置区域 -->
+            <div id="styleSettingsArea" class="hidden">
+                <div class="timeline-view-settings_block flex-container">
+                    <label for="tl_use_chat_colors" title="使用 ST/Luker 界面主题颜色，而不是此扩展在颜色设置中单独配置的颜色。" data-i18n="[title]使用 ST/Luker 界面主题颜色，而不是此扩展在颜色设置中单独配置的颜色。">使用界面主题</label>
+                    <input id="tl_use_chat_colors" type="checkbox" />
+                </div>
+                <div class="timeline-view-settings_block flex-container">
+                    <label for="tl_show_legend" title="显示图例，用颜色区分不同角色和聊天检查点。" data-i18n="[title]显示图例，用颜色区分不同角色和聊天检查点。">显示图例</label>
+                    <input id="tl_show_legend" type="checkbox" />
+                </div>
+                <div class="timeline-view-settings_block flex-container">
+                    <label for="tl_auto_expand_swipes" title="首次打开时间线视图以及每次刷新图时展开 swipe 节点。关闭时，可长按节点或点击“切换 Swipes”按钮展开。" data-i18n="[title]首次打开时间线视图以及每次刷新图时展开 swipe 节点。关闭时，可长按节点或点击“切换 Swipes”按钮展开。">自动展开 Swipe 节点</label>
+                    <input id="tl_auto_expand_swipes" type="checkbox" />
+                </div>
+                <div class="timeline-view-settings_block flex-container">
+                    <label for="tl_swipe_scale" title="启用后，带有 swipe 分支的节点除了双边框外，还会略微变大。" data-i18n="[title]启用后，带有 swipe 分支的节点除了双边框外，还会略微变大。">放大 Swipe 父节点</label>
+                    <input id="tl_swipe_scale" type="checkbox" />
+                </div>
+                <div class="timeline-view-settings_block flex-container">
+                    <label for="tl_avatar_as_root" title="将 AI 角色头像显示为图的根节点。关闭时，根节点为空白。" data-i18n="[title]将 AI 角色头像显示为图的根节点。关闭时，根节点为空白。">头像作为根节点</label>
+                    <input id="tl_avatar_as_root" type="checkbox" />
+                </div>
+                <!-- 注意：`index.js` 中的 `onInputChange` 依赖这里的一些具体约定来正确更新 Timelines 设置界面：
+
+                   - 缩放设置的特定元素 ID 会触发特殊处理；这五个设置之间存在非平凡联动逻辑。
+                   - `floatingpoint` class 会关闭设置值显示时的整数取整。
+                -->
+                <div class="timeline-view-settings_block flex-container">
+                    <label for="tl_zoom_current_chat">缩放到当前聊天时的缩放级别（<span id="tl_zoom_current_chat_value"></span>）</label>
+                    <input id="tl_zoom_current_chat" type="range" class="floatingpoint" min="0.1" max="10.0" step="0.1" />
+                </div>
+                <div class="timeline-view-settings_block flex-container">
+                    <input id="tl_zoom_min_cb" type="checkbox" />
+                    <label for="tl_zoom_min">最小缩放级别（<span id="tl_zoom_min_value"></span>）</label>
+                    <input id="tl_zoom_min" type="range" class="floatingpoint" min="0.1" max="10.0" step="0.1" />
+                </div>
+                <div class="timeline-view-settings_block flex-container">
+                    <input id="tl_zoom_max_cb" type="checkbox" />
+                    <label for="tl_zoom_max">最大缩放级别（<span id="tl_zoom_max_value"></span>）</label>
+                    <input id="tl_zoom_max" type="range" class="floatingpoint" min="0.1" max="10.0" step="0.1" />
+                </div>
+                <small>
+                    所有尺寸均为缩放级别 1.0 时的像素值。这里设置的尺寸乘以缩放级别，就是最终屏幕尺寸。 <!-- 各设置的准确含义可参考 Cytoscape 文档：https://js.cytoscape.org/ -->
+                </small>
+                <div class="timeline-view-settings_block flex-container">
+                    <label for="tl_node_width" title="缩放级别 1.0 时节点的宽度，单位为像素。" data-i18n="[title]缩放级别 1.0 时节点的宽度，单位为像素。">节点宽度（<span id="tl_node_width_value"></span>）</label>
+                    <input id="tl_node_width" type="range" min="1" max="100" />
+                </div>
+                <div class="timeline-view-settings_block flex-container">
+                    <label for="tl_node_height" title="缩放级别 1.0 时节点的高度，单位为像素。" data-i18n="[title]缩放级别 1.0 时节点的高度，单位为像素。">节点高度（<span id="tl_node_height_value"></span>）</label>
+                    <input id="tl_node_height" type="range" min="1" max="100" />
+                </div>
+                <div class="timeline-view-settings_block flex-container">
+                    <label for="tl_node_separation" title="同一层级中相邻节点之间的间距。" data-i18n="[title]同一层级中相邻节点之间的间距。">节点间距（<span id="tl_node_separation_value"></span>）</label>
+                    <input id="tl_node_separation" type="range" min="1" max="100" />
+                </div>
+                <div class="timeline-view-settings_block flex-container">
+                    <label for="tl_edge_separation" title="同一层级中相邻边之间的间距。" data-i18n="[title]同一层级中相邻边之间的间距。">边间距（<span id="tl_edge_separation_value"></span>）</label>
+                    <input id="tl_edge_separation" type="range" min="1" max="100" />
+                </div>
+                <div class="timeline-view-settings_block flex-container">
+                    <label for="tl_rank_separation" title="布局中各层级之间的间距。" data-i18n="[title]布局中各层级之间的间距。">层级间距（<span id="tl_rank_separation_value"></span>）</label>
+                    <input id="tl_rank_separation" type="range" min="1" max="100" />
+                </div>
+                <div class="timeline-view-settings_block flex-container">
+                    <label for="tl_spacing_factor" title="用于扩展节点整体占用区域的乘数。" data-i18n="[title]用于扩展节点整体占用区域的乘数。">间距系数（<span id="tl_spacing_factor_value"></span>）</label>
+                    <input id="tl_spacing_factor" type="range" min="1" max="100" />
+                </div>
+                <div class="timeline-view-settings_block flex-container">
+                    <label for="tl_node_ranker" title="自动图构建器为图节点分配层级（布局深度）的方式。" data-i18n="[title]自动图构建器为图节点分配层级（布局深度）的方式。">节点层级算法</label>
+                    <select id="tl_node_ranker">
+                        <option value="tight-tree">紧凑树</option>
+                        <option value="network-simplex">网络单纯形</option>
+                        <option value="longest-path">最长路径</option>
+                    </select>
+                </div>
+                <div class="timeline-view-settings_block flex-container">
+                    <label for="tl_node_shape" title="图中节点的视觉形状。" data-i18n="[title]图中节点的视觉形状。">节点形状</label>
+                    <select id="tl_node_shape">
+                        <option value="ellipse">椭圆</option>
+                        <option value="triangle">三角形</option>
+                        <option value="round-triangle">圆角三角形</option>
+                        <option value="rectangle">矩形</option>
+                        <option value="round-rectangle">圆角矩形</option>
+                        <option value="bottom-round-rectangle">底部圆角矩形</option>
+                        <option value="cut-rectangle">切角矩形</option>
+                        <option value="barrel">桶形</option>
+                        <option value="rhomboid">菱形平行四边形</option>
+                        <option value="right-rhomboid">右斜菱形平行四边形</option>
+                        <option value="diamond">钻石形</option>
+                        <option value="round-diamond">圆角钻石形</option>
+                        <option value="pentagon">五边形</option>
+                        <option value="round-pentagon">圆角五边形</option>
+                        <option value="hexagon">六边形</option>
+                        <option value="round-hexagon">圆角六边形</option>
+                        <option value="concave-hexagon">凹六边形</option>
+                        <option value="heptagon">七边形</option>
+                        <option value="round-heptagon">圆角七边形</option>
+                        <option value="octagon">八边形</option>
+                        <option value="round-octagon">圆角八边形</option>
+                        <option value="star">星形</option>
+                        <option value="tag">标签形</option>
+                        <option value="round-tag">圆角标签形</option>
+                        <option value="vee">V 形</option>
+                    </select>
+                </div>
+
+                <div class="timeline-view-settings_block flex-container">
+                    <label for="tl_curve_style" title="图中边的样式和走线方式。" data-i18n="[title]图中边的样式和走线方式。">边线样式</label>
+                    <select id="tl_curve_style">
+                        <option value="haystack">草堆线</option>
+                        <option value="straight">直线</option>
+                        <option value="straight-triangle">直线三角</option>
+                        <option value="bezier">贝塞尔曲线</option>
+                        <option value="unbundled-bezier">非捆绑贝塞尔曲线</option>
+                        <option value="segments">分段线</option>
+                        <option value="taxi">出租车折线</option>
+                    </select>
+                </div>
+                <div class="timeline-view-settings_block flex-container">
+                    <!-- 该术语来自 Cytoscape-Dagre README：
+                           https://github.com/cytoscape/cytoscape.js-dagre
+                           https://js.cytoscape.org/#layouts
+                    -->
+                    <label for="tl_align" title="层级节点的对齐方式。" data-i18n="[title]层级节点的对齐方式。">对齐方式</label>
+                    <select id="tl_align">
+                        <option value="UL">左上</option>
+                        <option value="UR">右上</option>
+                        <option value="DL">左下</option>
+                        <option value="DR">右下</option>
+                    </select>
+                </div>
+                <div class="timeline-view-settings_block flex-container">
+                    <input value="重置设置" class="menu_button" type="submit" id="resetSettingsBtn" title="将所有 Timelines 设置重置为默认值。" data-i18n="[title]将所有 Timelines 设置重置为默认值。">
+                </div>
+            </div>
+            <div class="timeline-view-settings_block flex-container">
+                <input value="颜色设置" class="menu_button" type="submit" id="toggleColorSettings" title="当样式设置中的“使用界面主题”关闭时，配置 Timelines 使用的颜色。" data-i18n="[title]当样式设置中的“使用界面主题”关闭时，配置 Timelines 使用的颜色。">
+            </div>
+            <div id="colorSettingsArea" class="hidden">
+                <div class="timeline-view-settings_block flex-container">
+                    <toolcool-color-picker id="bookmark-color-picker" value="#ff0000"></toolcool-color-picker>
+                    <span data-i18n="检查点颜色">检查点节点边框颜色</span>
+                </div>
+                <div class="timeline-view-settings_block flex-container">
+                    <toolcool-color-picker id="char-node-color-picker" value="#FFFFFF"></toolcool-color-picker>
+                    <span data-i18n="角色节点颜色">角色节点颜色</span>
+                </div>
+                <div class="timeline-view-settings_block flex-container">
+                    <toolcool-color-picker id="user-node-color-picker" value="#ADD8E6"></toolcool-color-picker>
+                    <span data-i18n="用户节点颜色">用户节点颜色</span>
+                </div>
+                <div class="timeline-view-settings_block flex-container">
+                    <toolcool-color-picker id="edge-color-picker" value="#555"></toolcool-color-picker>
+                    <span data-i18n="边颜色">边颜色</span>
+                </div>
+            </div>
+            <div class="timeline-view-settings_block flex-container">
+                <input id="show_timeline_view" class="menu_button" type="submit" value="显示时间线" title="打开时间线视图。等同于斜杠命令“/tl”。" data-i18n="[title]打开时间线视图。等同于斜杠命令“/tl”。" />
+            </div>
+            <!-- 模态框 -->
+            <div class="timelines-modal-storage hidden">  <!-- 未使用时存放模态框的 DOM 位置 -->
+                <div id="timelinesModal" class="modal">  <!-- 透明外层模态框，覆盖整个视口 -->
+                    <div id="networkContainer">  <!-- 内层模态框，即实际内容 -->
+                        <button class="close fa-solid fa-x" title="关闭"></button>
+                        <button class="rotate fa-solid fa-rotate-right" title="旋转图"></button>
+                        <button class="expand fa-solid fa-expand" title="切换 Swipes 展开"></button>
+                        <button class="reload fa-solid fa-sync" title="重新加载图 [/tl r]"></button>
+                        <button class="zoomtofit fa-solid fa-magnifying-glass-plus" title="缩放到适合窗口"></button>
+                        <button class="zoomtocurrent fa-solid fa-magnifying-glass-location" title="缩放到当前聊天"></button>
+                        <input id="transparent-search" type="text" placeholder="搜索 [Ctrl+Shift+F]..." />
+                        <div class="graph-container">
+                            <!-- 相对定位容器 -->
+                            <div id="timelinesDiagramDiv"></div>
+                            <div id="legendDiv" class="legend-bottom-right"></div>
+                            <div id="fixedReference" style="position: fixed; bottom: 0; left: 0; width: 0; height: 0;"></div>
+                            <!-- 绝对定位的图例 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

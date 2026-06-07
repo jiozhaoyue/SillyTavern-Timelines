@@ -1,0 +1,264 @@
+/* 不可见的外层模态框，覆盖整个视口 */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    /* 可按需增大该值 */
+    left: 0;
+    top: 0;
+    width: 100vw;
+    /* 覆盖视口完整宽度 */
+    height: 100vh;
+    /* 覆盖视口完整高度 */
+}
+
+/* 内层模态框，包含实际的 Timelines 窗口 */
+#networkContainer {
+    background-color: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(var(--SmartThemeBlurStrength));
+    background-color: var(--SmartThemeBlurTintColor);
+    -webkit-backdrop-filter: blur(var(--SmartThemeBlurStrength));
+    text-shadow: 0px 0px calc(var(--shadowWidth) * 1px) var(--SmartThemeShadowColor);
+    padding: 20px;
+    border: 1px solid #888;
+    width: 90vw;
+    height: 90vh;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    overflow: hidden;
+}
+
+.graph-container {  /* 时间线图和图例的顶层容器 */
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+}
+
+#timelinesDiagramDiv {  /* 时间线图容器 */
+    /* 让图占满模态内容区域 */
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.legend-bottom-right {  /* 图例容器 */
+    position: absolute;
+    bottom: 10px; /* 距底部偏移 */
+    right: 10px; /* 距右侧偏移 */
+    z-index: 10; /* 保持在上层 */
+    overflow-y: scroll;
+    max-height: 90%;
+    border: 1px solid var(--SmartThemeBorderColor);
+    padding: 5px;
+    border-radius: 5px;
+    background-color: rgba(0, 0, 0, 0.7); /* 半透明背景 */
+    backdrop-filter: blur(var(--SmartThemeBlurStrength));
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    margin: 8px 0;
+}
+
+.legend-symbol {
+    width: 25px;
+    height: 25px;
+    border-radius: 50%; /* 显示为圆形 */
+    margin-right: 10px;
+}
+
+.legend-text {
+    flex: 1;
+}
+
+.active-legend {
+    box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.1), /* existing shadow */
+                inset 0 0 0 2px rgba(0, 0, 0, 0.3); /* 模拟边框 */
+    border-radius: 5px;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* 关闭按钮 */
+.close {
+    color: #aaaaaa;
+    float: right;
+    font-size: 24px;
+    font-weight: bold;
+    z-index: 3;
+    position: relative;
+    background: none;
+        border: none;
+        padding: 0;
+}
+.close:hover {
+    color: red;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* 展开按钮（切换 Swipes） */
+.expand {
+    color: #aaaaaa;
+    float: right;
+    font-size: 24px;
+    font-weight: bold;
+    z-index: 3;
+    position: relative;
+    background: none;
+        border: none;
+        padding: 0;
+        padding-right: 10px;
+}
+.expand:hover {
+    color: #808080;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* 旋转按钮 */
+.rotate {
+    color: #aaaaaa;
+    float: right;
+    font-size: 24px;
+    font-weight: bold;
+    z-index: 3;
+    position: relative;
+    background: none;
+        border: none;
+        padding: 0;
+        padding-right: 10px;
+}
+.rotate:hover {
+    color: #808080;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* 重新加载按钮 */
+.reload {
+    color: #aaaaaa;
+    float: right;
+    font-size: 24px;
+    font-weight: bold;
+    z-index: 3;
+    position: relative;
+    background: none;
+    border: none;
+    padding: 0;
+    padding-right: 10px;
+}
+.reload:hover {
+    color: #808080;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* 缩放到适合窗口按钮 */
+.zoomtofit {
+    color: #aaaaaa;
+    float: right;
+    font-size: 24px;
+    font-weight: bold;
+    z-index: 3;
+    position: relative;
+    background: none;
+    border: none;
+    padding: 0;
+    padding-right: 10px;
+}
+.zoomtofit:hover {
+    color: #808080;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* 缩放到当前聊天按钮 */
+.zoomtocurrent {
+    color: #aaaaaa;
+    float: right;
+    font-size: 24px;
+    font-weight: bold;
+    z-index: 3;
+    position: relative;
+    background: none;
+    border: none;
+    padding: 0;
+    padding-right: 10px;
+}
+.zoomtocurrent:hover {
+    color: #808080;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.hidden {
+    display: none;
+}
+
+#transparent-search {  /* 文本搜索框 */
+    background-color: transparent;
+    border: none;
+    outline: none;
+    color: white;
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 200px;
+    font-size: 16px;
+    z-index: 10;
+}
+
+.timelines-text-search-match {
+    font-weight: bold;
+    color: red;
+}
+
+.tippy-box {  /* Cytoscape 或 Tippy 渲染的大部分内容 */
+    background-color: rgba(255, 255, 255, 0.7);  /* TODO: 会被 Cytoscape 主题覆盖，这里可能不再需要；其他 background-color 项也类似。 */
+    backdrop-filter: blur(var(--SmartThemeBlurStrength));
+    background-color: var(--SmartThemeBlurTintColor);
+    -webkit-backdrop-filter: blur(var(--SmartThemeBlurStrength));
+    text-shadow: 0px 0px calc(var(--shadowWidth) * 1px) var(--SmartThemeShadowColor);
+    padding: 20px;
+    border: 1px solid var(--SmartThemeShadowColor);
+    max-width: 80vw;
+    width: auto; /* 保持响应式 */
+    max-height: 80vh;
+    height: auto;
+    /* overflow: auto; */
+    border-radius: 4px; /* 圆角 */
+}
+
+.tippy-box button:hover {
+    background-color: #0056b3;
+}
+
+.tap_tippy_content {  /* 完整信息面板 */
+    max-height: 75vh;
+    max-width: 80vw;
+    overflow: auto;
+}
+
+.tippy-box .menu_div {  /* 完整信息面板中的导航按钮区域 */
+    max-height: 45vh;
+    overflow-y: auto;
+}
+
+.tippy-box .menu_button {  /* 完整信息面板中的单个导航按钮 */
+    width: 100%;
+}
+
+.tippy-box .name_text {
+    font-weight: bold;
+}
+
+.tippy-box .mes_text {  /* 完整信息面板中的消息内容区域 */
+    max-height: 50vh;
+    max-width: 70vw;
+    overflow-y: auto;
+}

@@ -4,7 +4,7 @@
     "requires": [],
     "optional": [],
     "js": "index.js",
-    "css": "tl_style.css",
+    "css": "style.css",
     "author": "city-unit",
     "version": "1.2.0",
     "homePage": "https://github.com/SillyTavern/SillyTavern-Timelines",
