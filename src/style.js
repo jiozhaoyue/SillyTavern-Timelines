@@ -7,59 +7,9 @@ function getTimelinesContext() {
     return window.Luker?.getContext?.() ?? getContext();
 }
 
-/**
- * Highlights the path from a specified checkpoint node to the root in a data structure representing a Cytoscape graph.
- * The function iteratively traces and highlights edges and nodes, adjusting visual attributes like color, thickness, and zIndex.
- *
- * @param {Object} rawData - The data structure representing the Cytoscape graph with nodes and edges.
- * @param {string|number} bookmarkNodeId - The ID of the checkpoint node to start highlighting from.
- * @param {number} currentHighlightThickness - The starting thickness for highlighting edges (default is 4).
- * @param {number} startingZIndex - The starting zIndex for nodes and edges to be highlighted (default is 1000).
- */
-function highlightPathToRoot(rawData, bookmarkNodeId, currentHighlightThickness = 4, startingZIndex = 1000) {
-    let bookmarkNode = Object.values(rawData).find(entry =>
-        entry.group === 'nodes' && entry.data.id === bookmarkNodeId,
-    );
+import { highlightPathToRoot } from './graph-builder.js';
 
-    if (!bookmarkNode) {
-        console.error('Timelines: 未找到检查点节点。');
-        return;
-    }
-
-    let currentNode = bookmarkNode;
-    let currentZIndex = startingZIndex;
-    while (currentNode) {
-        // If the current node has the isBookmark attribute and it's not the initial bookmarkNode, stop highlighting
-        if (currentNode !== bookmarkNode && currentNode.data.isBookmark) {
-            break; // exit from the while loop
-        }
-
-        let incomingEdge = Object.values(rawData).find(entry =>
-            entry.group === 'edges' && entry.data.target === currentNode.data.id,
-        );
-
-        if (incomingEdge) {
-            incomingEdge.data.isHighlight = true;
-            incomingEdge.data.color = bookmarkNode.data.color;
-            incomingEdge.data.bookmarkName = bookmarkNode.data.bookmarkName;
-            incomingEdge.data.highlightThickness = currentHighlightThickness;
-            currentHighlightThickness = Math.min(currentHighlightThickness + 0.1, 6);
-
-            currentNode.data.borderColor = incomingEdge.data.color;
-
-            // Set the zIndex of the incomingEdge
-            incomingEdge.data.zIndex = currentZIndex;
-            currentZIndex++; // Increase the zIndex for the next edge in the path
-
-            // Select the next node up
-            currentNode = Object.values(rawData).find(entry =>
-                entry.group === 'nodes' && entry.data.id === incomingEdge.data.source,
-            );
-        } else {  // This was the topmost node
-            currentNode = null;
-        }
-    }
-}
+export { highlightPathToRoot };
 
 /**
  * Sets up visual styles for nodes and edges based on provided node data and context settings.
@@ -87,10 +37,6 @@ export function setupStylesAndData(nodeData) {
         theme.edgeColor = power_user.italics_text_color;
         theme.userNodeColor = power_user.quote_text_color;
         theme.bookmarkColor = 'rgba(255, 215, 0, 1)'; // 金色
-        // power_user.blur_tint_color;
-        // power_user.user_mes_blur_tint_color;
-        // power_user.bot_mes_blur_tint_color;
-        // power_user.shadow_color;
     }
     else {
         theme.charNodeColor = extension_settings.timeline.charNodeColor;
@@ -99,11 +45,37 @@ export function setupStylesAndData(nodeData) {
         theme.bookmarkColor = extension_settings.timeline.bookmarkColor;
     }
 
-    Object.values(nodeData).forEach(entry => {
-        if (entry.group === 'nodes' && entry.data.isBookmark) {
-            highlightPathToRoot(nodeData, entry.data.id);
+    const nodeMap = new Map();
+    const incomingEdgeMap = new Map();
+    const bookmarkNodes = [];
+
+    const rawEntries = Array.isArray(nodeData) ? nodeData : Object.values(nodeData || {});
+    for (const entry of rawEntries) {
+        if (!entry?.data?.id) continue;
+        if (entry.group === 'nodes') {
+            nodeMap.set(entry.data.id, entry);
+            if (entry.data.isBookmark) {
+                bookmarkNodes.push(entry);
+            }
+        } else if (entry.group === 'edges' && entry.data.target) {
+            incomingEdgeMap.set(entry.data.target, entry);
         }
+    }
+
+    bookmarkNodes.forEach(bookmarkNode => {
+        highlightPathToRoot(nodeMap, incomingEdgeMap, bookmarkNode);
     });
+
+    if (extension_settings.timeline.swipeScale) {
+        for (const entry of nodeMap.values()) {
+            const totalSwipes = Number(entry.data?.totalSwipes) || 0;
+            if (totalSwipes > 0) {
+                const add = Math.abs(Math.log(totalSwipes + 1)) * 4;
+                entry.data.nodeWidth = add + Number(extension_settings.timeline.nodeWidth);
+                entry.data.nodeHeight = add + Number(extension_settings.timeline.nodeHeight);
+            }
+        }
+    }
 
     const cytoscapeStyles = [
         {
@@ -111,61 +83,86 @@ export function setupStylesAndData(nodeData) {
             style: {
                 'curve-style': extension_settings.timeline.curveStyle,
                 'taxi-direction': 'rightward',
-                'segment-distances': [5, 5], // corner radius
-                'line-color': function (ele) {
-                    return ele.data('isHighlight') ? ele.data('color') : theme.edgeColor;
-                },
-                'line-opacity': function (ele) {
-                    return ele.data('isHighlight') ? 1 : getAlphaFromColor(theme.edgeColor);
-                },
-                'width': function (ele) {
-                    return ele.data('highlightThickness') ? ele.data('highlightThickness') : 3;
-                },
-                'z-index': function (ele) {
-                    return ele.data('zIndex') ? ele.data('zIndex') : 1;
-                },
+                'segment-distances': [5, 5],
+                'line-color': theme.edgeColor,
+                'line-opacity': getAlphaFromColor(theme.edgeColor),
+                'width': 3,
+                'z-index': 1,
+            },
+        },
+        {
+            selector: 'edge[?isHighlight]',
+            style: {
+                'line-color': 'data(color)',
+                'line-opacity': 1,
+                'width': 'data(highlightThickness)',
+                'z-index': 'data(zIndex)',
+            },
+        },
+        {
+            selector: 'edge[?isSwipe]',
+            style: {
+                'line-style': 'dashed',
+                'line-opacity': .5,
             },
         },
         {
             selector: 'node',
             style: {
-                'width': function (ele) {
-                    let totalSwipes = Number(ele.data('totalSwipes'));
-                    if (isNaN(totalSwipes)) {
-                        totalSwipes = 0;
-                    }
-                    return extension_settings.timeline.swipeScale ? Math.abs(Math.log(totalSwipes + 1)) * 4 + Number(extension_settings.timeline.nodeWidth) : extension_settings.timeline.nodeWidth;
-                },
-                'height': function (ele) {
-                    let totalSwipes = Number(ele.data('totalSwipes'));
-                    if (isNaN(totalSwipes)) {
-                        totalSwipes = 0;
-                    }
-                    return extension_settings.timeline.swipeScale ? Math.abs(Math.log(totalSwipes + 1)) * 4 + Number(extension_settings.timeline.nodeHeight) : extension_settings.timeline.nodeHeight;
-                },
-
-                'shape': extension_settings.timeline.nodeShape,  // 也可使用 'circle'
-                'background-color': function (ele) {
-                    return ele.data('is_user') ? theme.userNodeColor : theme.charNodeColor;
-                },
-                'background-opacity': function (ele) {
-                    return ele.data('is_user') ? getAlphaFromColor(theme.userNodeColor) : getAlphaFromColor(theme.charNodeColor);
-                },
-                'border-color': function (ele) {
-                    // NOTE: We highlight the checkpoint node itself based on the color theme, ignoring its 'borderColor' property.
-                    //       All the other nodes along the checkpoint path get highlighted with the checkpoint's random color.
-                    return ele.data('isBookmark') ? theme.bookmarkColor : ele.data('borderColor') ? ele.data('borderColor') : ele.data('totalSwipes') ? (ele.data('is_user') ? theme.userNodeColor : theme.charNodeColor) : 'black';
-                },
-                'border-width': function (ele) {
-                    return ele.data('isBookmark') || ele.data('totalSwipes') ? 5 : ele.data('borderColor') ? 3 : 0;
-                },
-                'border-opacity': function (ele) {
-                    // The remark of 'border-color' applies here, too.
-                    return ele.data('isBookmark') ? getAlphaFromColor(theme.bookmarkColor) : ele.data('borderColor') ? 1 : ele.data('totalSwipes') > 0 ? 1 : 0;
-                },
-                'border-style': function (ele) {
-                    return ele.data('totalSwipes') > 0 ? 'double' : 'solid';  // Halo around node with swipes
-                },
+                'width': extension_settings.timeline.nodeWidth,
+                'height': extension_settings.timeline.nodeHeight,
+                'shape': extension_settings.timeline.nodeShape,
+                'background-color': theme.charNodeColor,
+                'background-opacity': getAlphaFromColor(theme.charNodeColor),
+                'border-color': 'black',
+                'border-width': 0,
+                'border-style': 'solid',
+                'border-opacity': 0,
+            },
+        },
+        {
+            selector: 'node[?nodeWidth]',
+            style: {
+                'width': 'data(nodeWidth)',
+                'height': 'data(nodeHeight)',
+            },
+        },
+        {
+            selector: 'node[?is_user]',
+            style: {
+                'background-color': theme.userNodeColor,
+                'background-opacity': getAlphaFromColor(theme.userNodeColor),
+            },
+        },
+        {
+            selector: 'node[totalSwipes > 0]',
+            style: {
+                'border-style': 'double',
+                'border-width': 5,
+                'border-opacity': 1,
+                'border-color': theme.charNodeColor,
+            },
+        },
+        {
+            selector: 'node[totalSwipes > 0][?is_user]',
+            style: {
+                'border-color': theme.userNodeColor,
+            },
+        },
+        {
+            selector: 'node[?borderColor]',
+            style: {
+                'border-color': 'data(borderColor)',
+                'border-width': 3,
+                'border-opacity': 1,
+            },
+        },
+        {
+            selector: 'node[?isBookmark]',
+            style: {
+                'border-color': theme.bookmarkColor,
+                'border-width': 5,
+                'border-opacity': getAlphaFromColor(theme.bookmarkColor),
             },
         },
         {
@@ -173,51 +170,37 @@ export function setupStylesAndData(nodeData) {
             style: {
                 'background-image': extension_settings.timeline.avatarAsRoot ? avatarImg : 'none',
                 'background-fit': extension_settings.timeline.avatarAsRoot ? 'cover' : 'none',
-                // TODO: Ideally, we should determine the aspect ratio from the avatar image.
                 'width': extension_settings.timeline.avatarAsRoot ? '40px' : extension_settings.timeline.nodeWidth,
                 'height': extension_settings.timeline.avatarAsRoot ? '50px' : extension_settings.timeline.nodeHeight,
                 'shape': extension_settings.timeline.avatarAsRoot ? 'rectangle' : extension_settings.timeline.nodeShape,
             },
         },
-
         {
-            selector: 'node[?is_system]',  // Select nodes with is_system property set to true
+            selector: 'node[?is_system]',
             style: {
                 'background-color': 'grey',
                 'border-style': 'dashed',
                 'border-width': 3,
-                'border-color': function (ele) {
-                    return ele.data('isBookmark') ? extension_settings.timeline.bookmarkColor : ele.data('borderColor') ? ele.data('borderColor') : 'black';
-                },
+                'border-color': 'grey',
+                'border-opacity': 1,
             },
         },
         {
-            selector: 'node[?isSwipe]',  // Select nodes with isSwipe property set to true
+            selector: 'node[?isSwipe]',
             style: {
                 'background-opacity': .5,
                 'border-width': 3,
-                'border-color': function (ele) {
-                    return ele.data('isBookmark') ? extension_settings.timeline.bookmarkColor : ele.data('borderColor') ? ele.data('borderColor') : 'grey';
-                },
+                'border-color': 'grey',
                 'border-style': 'dashed',
                 'border-opacity': 1,
             },
         },
         {
-            selector: 'edge[?isSwipe]',
-
-            style: {
-                'line-style': 'dashed',
-                'line-opacity': .5,
-            },
-        },
-        {
-            selector: '.NoticeMe',  // This gets flashed on and off upon zooming to the current chat node
+            selector: '.NoticeMe',
             style: {
                 'background-opacity': 0.5,
-            }
-        }
-
+            },
+        },
     ];
 
     return cytoscapeStyles;
@@ -225,65 +208,55 @@ export function setupStylesAndData(nodeData) {
 
 /**
  * Highlights specific elements (nodes or edges) in a Cytoscape graph based on a given selector.
- * Used e.g. in the text search functionality.
- *
- * Initially, all elements in the graph are dimmed. Based on the provided selector, matching nodes or edges are then
- * highlighted with a white underlay. If the selector pertains to an edge with a specific color, nodes with the same
- * border color are also highlighted.
- *
- * @param {Object} cy - The Cytoscape instance containing the graph elements.
- * @param {string|function} selector - A Cytoscape-compatible selector string used to determine which elements to highlight.
- *                                     Alternatively, a callable selector; in that case, it is assumed to select nodes.
- *                                     This is safer when selecting by node text content, which may include special characters.
  */
 export function highlightElements(cy, selector) {
-    cy.elements().style({ 'opacity': 0.2 });  // Dim all nodes and edges
+    if (!cy) return;
 
-    // Defaults for when `selector` selects nodes.
-    let underlayPadding = '5px';
-    let underlayShape = 'ellipse';
+    cy.batch(() => {
+        cy.elements().style({ 'opacity': 0.2 });
 
-    // If it's an edge selector (i.e. for a checkpoint path)
-    if (((typeof selector === "string") || (selector instanceof String)) && selector.startsWith('edge')) {
-        let colorValue = selector.match(/color="([^"]+)"/)[1];  // Extract the color from the selector
-        let nodeSelector = `node[borderColor="${colorValue}"]`;  // Construct the corresponding node selector
+        let underlayPadding = '5px';
+        let underlayShape = 'ellipse';
 
-        // Style the associated nodes
-        cy.elements(nodeSelector).style({
+        if (((typeof selector === "string") || (selector instanceof String)) && selector.startsWith('edge')) {
+            let match = selector.match(/color="([^"]+)"/);
+            if (match) {
+                let colorValue = match[1];
+                let nodeSelector = `node[borderColor="${colorValue}"]`;
+                cy.elements(nodeSelector).style({
+                    'opacity': 1,
+                    'underlay-color': 'white',
+                    'underlay-padding': '2px',
+                    'underlay-opacity': 0.5,
+                    'underlay-shape': 'ellipse',
+                });
+            }
+            underlayPadding = '2px';
+            underlayShape = '';
+        }
+
+        cy.elements(selector).style({
             'opacity': 1,
             'underlay-color': 'white',
-            'underlay-padding': '2px',
+            'underlay-padding': underlayPadding,
             'underlay-opacity': 0.5,
-            'underlay-shape': 'ellipse',
+            'underlay-shape': underlayShape,
         });
-
-        // For edges.
-        underlayPadding = '2px';
-        underlayShape = '';
-    }
-
-    // Style the originally selected elements (any kind)
-    cy.elements(selector).style({
-        'opacity': 1,
-        'underlay-color': 'white',
-        'underlay-padding': underlayPadding,
-        'underlay-opacity': 0.5,
-        'underlay-shape': underlayShape,
     });
 }
 
 /**
  * Restores all elements in a Cytoscape graph to their default visual state.
- * The opacity of all elements is set back to 1, and any applied underlays are removed.
- *
- * @param {Object} cy - The Cytoscape instance containing the graph elements.
  */
 export function restoreElements(cy) {
-    cy.elements().style({
-        'opacity': 1,
-        'underlay-color': '',
-        'underlay-padding': '',
-        'underlay-opacity': '',
-        'underlay-shape': '',
+    if (!cy) return;
+    cy.batch(() => {
+        cy.elements().style({
+            'opacity': 1,
+            'underlay-color': '',
+            'underlay-padding': '',
+            'underlay-opacity': '',
+            'underlay-shape': '',
+        });
     });
 }

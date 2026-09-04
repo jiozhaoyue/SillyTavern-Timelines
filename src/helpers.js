@@ -82,3 +82,24 @@ export function escapeHtml(value) {
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&#39;');
 }
+
+/**
+ * 防抖函数，避免高频连续触发
+ *
+ * @param {Function} func - 要执行的目标函数
+ * @param {number} wait - 等待时间（毫秒）
+ * @returns {Function} 防抖包装后的函数
+ */
+export function debounce(func, wait = 250) {
+    let timeout = null;
+    return function debounced(...args) {
+        if (timeout) {
+            clearTimeout(timeout);
+        }
+        timeout = setTimeout(() => {
+            timeout = null;
+            func.apply(this, args);
+        }, wait);
+    };
+}
+

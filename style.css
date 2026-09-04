@@ -45,6 +45,17 @@
     bottom: 0;
 }
 
+#timelinesDiagramDiv.timelines-empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    padding: 2rem;
+    color: var(--SmartThemeBodyColor);
+    font-size: 1.05rem;
+    text-align: center;
+}
+
 .legend-bottom-right {  /* 图例容器 */
     position: absolute;
     bottom: 10px; /* 距底部偏移 */

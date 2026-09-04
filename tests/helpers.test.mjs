@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
     cloneSwipeExtra,
+    debounce,
     escapeRegExp,
     getAlphaFromColor,
     makeContextKey,
@@ -53,3 +54,19 @@ test('cloneSwipeExtra deep-clones swipe extra before falling back to message ext
     assert.equal(swipeExtra.nested.value, 1);
     assert.deepEqual(cloned, { nested: { value: 2 } });
 });
+
+test('debounce delays execution and suppresses rapid calls', async () => {
+    let callCount = 0;
+    const fn = debounce(() => {
+        callCount += 1;
+    }, 50);
+
+    fn();
+    fn();
+    fn();
+
+    assert.equal(callCount, 0);
+    await new Promise(r => setTimeout(r, 80));
+    assert.equal(callCount, 1);
+});
+
