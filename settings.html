@@ -1,4 +1,4 @@
-<div id="timelines_container" class="extension_container">
+<div id="timelines_container" class="extension_container" data-extension-name="SillyTavern-Timelines">
     <div class="timeline-view-settings">
         <div class="inline-drawer">
         <div class="inline-drawer-toggle inline-drawer-header">
@@ -19,7 +19,7 @@
                 <input id="tl_gpu_acceleration" type="checkbox" />
             </div>
             <div class="timeline-view-settings_block flex-container">
-                <input value="样式设置" class="menu_button" type="submit" id="toggleStyleSettings" title="Timelines 图的视觉外观设置。" data-i18n="[title]Timelines 图的视觉外观设置。">
+                <input value="样式设置" class="menu_button" type="button" id="toggleStyleSettings" title="Timelines 图的视觉外观设置。" data-i18n="[title]Timelines 图的视觉外观设置。">
             </div>
             <!-- 可折叠的样式设置区域 -->
             <div id="styleSettingsArea" class="hidden">
@@ -154,11 +154,11 @@
                     </select>
                 </div>
                 <div class="timeline-view-settings_block flex-container">
-                    <input value="重置设置" class="menu_button" type="submit" id="resetSettingsBtn" title="将所有 Timelines 设置重置为默认值。" data-i18n="[title]将所有 Timelines 设置重置为默认值。">
+                    <input value="重置设置" class="menu_button" type="button" id="resetSettingsBtn" title="将所有 Timelines 设置重置为默认值。" data-i18n="[title]将所有 Timelines 设置重置为默认值。">
                 </div>
             </div>
             <div class="timeline-view-settings_block flex-container">
-                <input value="颜色设置" class="menu_button" type="submit" id="toggleColorSettings" title="当样式设置中的“使用界面主题”关闭时，配置 Timelines 使用的颜色。" data-i18n="[title]当样式设置中的“使用界面主题”关闭时，配置 Timelines 使用的颜色。">
+                <input value="颜色设置" class="menu_button" type="button" id="toggleColorSettings" title="当样式设置中的“使用界面主题”关闭时，配置 Timelines 使用的颜色。" data-i18n="[title]当样式设置中的“使用界面主题”关闭时，配置 Timelines 使用的颜色。">
             </div>
             <div id="colorSettingsArea" class="hidden">
                 <div class="timeline-view-settings_block flex-container">
@@ -170,6 +170,8 @@
                     <span data-i18n="角色节点颜色">角色节点颜色</span>
                 </div>
                 <div class="timeline-view-settings_block flex-container">
+                </div>
+                <div class="timeline-view-settings_block flex-container">
                     <toolcool-color-picker id="user-node-color-picker" value="#ADD8E6"></toolcool-color-picker>
                     <span data-i18n="用户节点颜色">用户节点颜色</span>
                 </div>
@@ -179,7 +181,19 @@
                 </div>
             </div>
             <div class="timeline-view-settings_block flex-container">
-                <input id="show_timeline_view" class="menu_button" type="submit" value="显示时间线" title="打开时间线视图。等同于斜杠命令“/tl”。" data-i18n="[title]打开时间线视图。等同于斜杠命令“/tl”。" />
+                <input value="缓存管理" class="menu_button" type="button" id="toggleCacheSettings" title="管理时间线本地持久化缓存（IndexedDB）与同步设置。" data-i18n="[title]管理时间线本地持久化缓存（IndexedDB）与同步设置。">
+            </div>
+            <div id="cacheSettingsArea" class="hidden">
+                <div class="timeline-view-settings_block flex-container" style="justify-content: space-between; align-items: center;">
+                    <span id="timelinesCacheStatus" style="font-size: 0.9em; opacity: 0.8;">缓存状态：正在读取...</span>
+                </div>
+                <div class="timeline-view-settings_block flex-container" style="gap: 8px;">
+                    <input id="refreshCurrentCacheBtn" class="menu_button" type="button" value="刷新当前角色缓存" title="清除当前角色的本地缓存，并在下次打开时重新全量拉取。" />
+                    <input id="clearAllCacheBtn" class="menu_button" type="button" value="清空全部缓存" title="清除所有角色的 IndexedDB 本地缓存。" />
+                </div>
+            </div>
+            <div class="timeline-view-settings_block flex-container">
+                <input id="show_timeline_view" class="menu_button" type="button" value="显示时间线" title="打开时间线视图。等同于斜杠命令“/tl”。" data-i18n="[title]打开时间线视图。等同于斜杠命令“/tl”。" />
             </div>
             <!-- 模态框 -->
             <div class="timelines-modal-storage hidden">  <!-- 未使用时存放模态框的 DOM 位置 -->

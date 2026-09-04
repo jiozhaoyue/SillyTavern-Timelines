@@ -80,7 +80,9 @@ import { navigateToMessage, closeModal, closeTippy, handleModalDisplay, closeOpe
 import { setupStylesAndData, highlightElements, restoreElements } from './src/style.js';
 import { fetchData, prepareData } from './src/node-data.js';
 import { toggleGraphOrientation, highlightNodesByQuery, makeQueryFragments, setGraphOrientationBasedOnViewport, getGraphOrientation } from './src/graph.js';
-import { escapeHtml, escapeRegExp, makeContextKey } from './src/helpers.js';
+import { debounce, escapeHtml, escapeRegExp, makeContextKey } from './src/helpers.js';
+import { layoutService } from './src/layout-service.js';
+import { timelinesCache } from './src/cache.js';
 import { registerSlashCommand } from '../../../slash-commands.js';
 import { fixMarkdown } from '../../../power-user.js';
 import { hideLoader, showLoader } from '../../../loader.js';
@@ -976,7 +978,7 @@ function calculateFitZoom(cy, eles) {
  * @param {Array<Object>} styles - Array of style definitions for nodes, edges, and other graph elements.
  * @returns {Object|null} Returns the Cytoscape instance if initialization is successful, otherwise returns null.
  */
-function initializeCytoscape(nodeData, styles) {
+function initializeCytoscape(nodeData, styles, layoutConfig = layout) {
     let timelinesDiagramDiv = document.getElementById('timelinesDiagramDiv');
     if (!timelinesDiagramDiv) {
         console.error('Timelines: 找不到 id 为 "timelinesDiagramDiv" 的元素。请确认调用时该元素已经存在。');
@@ -994,8 +996,11 @@ function initializeCytoscape(nodeData, styles) {
         container: timelinesDiagramDiv,
         elements: nodeData,
         style: styles,
-        layout: layout,
+        layout: layoutConfig,
         wheelSensitivity: 0.2,  // Adjust as needed.
+        textureOnViewport: true,
+        hideEdgesOnViewport: true,
+        pixelRatio: 'auto',
     });
     theCy = cy;
 
@@ -1232,9 +1237,13 @@ function setupEventHandlers(cy, nodeData) {
         });
     }
 
+    const debouncedPerformTextSearch = debounce(() => {
+        performTextSearch();
+    }, 250);
+
     // The text search field is a garden-variety DOM element, so attach an event listener the classical way.
     textSearchElement.addEventListener('input', function (evt) {
-        performTextSearch();
+        debouncedPerformTextSearch();
     }, { signal: uiEventAbortController.signal });
     textSearchElement.addEventListener('focus', function (evt) {
         performTextSearch();
@@ -1521,7 +1530,7 @@ function setupEventHandlers(cy, nodeData) {
  *
  * @param {Object} nodeData - The data used to render the nodes and edges of the Cytoscape diagram.
  */
-function renderCytoscapeDiagram(nodeData) {
+function renderCytoscapeDiagram(nodeData, customLayout = null) {
     if (theCy) {
         theCy.destroy();
         theCy = null;
@@ -1530,7 +1539,8 @@ function renderCytoscapeDiagram(nodeData) {
     uiEventAbortController = new AbortController();
 
     const styles = setupStylesAndData(nodeData);
-    const cy = initializeCytoscape(nodeData, styles);
+    const activeLayout = customLayout || layout;
+    const cy = initializeCytoscape(nodeData, styles, activeLayout);
     if (cy) {
         if (extension_settings.timeline.enableMinZoom) {
             cy.minZoom(Number(extension_settings.timeline.minZoom));
@@ -1548,38 +1558,35 @@ function renderCytoscapeDiagram(nodeData) {
  * is different from the last known context, it fetches and prepares the required data.
  * The function then updates the layout configuration based on extension settings.
  *
+ * @param {boolean} [forceReload=false] - 是否强制清空缓存并全量拉取数据。
  * @returns {Promise<boolean>} Returns true if the timeline data was updated, and false otherwise.
  */
-async function updateTimelineDataIfNeeded() {
+async function updateTimelineDataIfNeeded(forceReload = false) {
     const context = getTimelinesContext();
     const contextKey = makeContextKey(context);
-    if (lastContextKey !== contextKey) {
+    if (forceReload || lastContextKey !== contextKey) {
         let data = {};
 
         if (!context.characterId) {  // group chat
             let groupID = context.groupId;
             if (groupID) {
-                // Send the group where the ID within the dict is equal to groupID
                 let group = context.groups.find(group => group.id === groupID);
                 if (!group?.chats?.length) {
                     lastTimelineData = [];
                     lastContextKey = contextKey;
                     return true;
                 }
-                // For each `group.chats`, we add to a dict with the key being the index and the value being the chat
-                // (`prepareData` ignores the keys, it needs the values only)
                 for (let i = 0; i < group.chats.length; i++) {
-                    console.debug(group.chats[i]);
                     data[i] = { 'file_name': group.chats[i] };
                 }
-                lastTimelineData = await prepareData(data, true);
+                lastTimelineData = await prepareData(data, true, forceReload);
             } else {
                 lastTimelineData = [];
             }
         }
         else {
             data = await fetchData(context.characters[context.characterId].avatar);
-            lastTimelineData = await prepareData(data);
+            lastTimelineData = await prepareData(data, false, forceReload);
         }
 
         lastContextKey = contextKey;
@@ -1672,7 +1679,7 @@ function flashNode(node, howManyFlashes, duration) {
  *
  * @returns {Promise<void>}
  */
-async function onTimelineButtonClick() {
+async function onTimelineButtonClick(forceReload = false) {
     let dataUpdated = false;
     try {
         showLoader();
@@ -1681,7 +1688,7 @@ async function onTimelineButtonClick() {
             toastr.error('Timelines: 第三方依赖加载失败，无法打开时间线。');
             return;
         }
-        dataUpdated = await updateTimelineDataIfNeeded();
+        dataUpdated = await updateTimelineDataIfNeeded(forceReload);
     }
     finally {
         await delay(1);  // This avoids the loading screen getting stuck when there is no need to update the data.
@@ -1689,8 +1696,28 @@ async function onTimelineButtonClick() {
     }
 
     handleModalDisplay();  // Show the timeline view, and wire the close button to close it.
-    if (dataUpdated) {
-        renderCytoscapeDiagram(lastTimelineData);  // after this, the Cytoscape instance `theCy` is alive
+    if (dataUpdated || !theCy) {
+        let activeLayout = layout;
+        if (Array.isArray(lastTimelineData) && lastTimelineData.length > 0) {
+            try {
+                const layoutRes = await layoutService.computeLayout(lastTimelineData, {
+                    ...layout,
+                    nodeWidth: extension_settings.timeline.nodeWidth,
+                    nodeHeight: extension_settings.timeline.nodeHeight,
+                });
+                if (layoutRes.success && layoutRes.positions) {
+                    activeLayout = {
+                        name: 'preset',
+                        positions: (node) => layoutRes.positions[node.id()] || { x: 0, y: 0 },
+                        fit: true,
+                        padding: 50,
+                    };
+                }
+            } catch (err) {
+                console.warn('Timelines: 异步布局计算异常，采用主线程布局：', err);
+            }
+        }
+        renderCytoscapeDiagram(lastTimelineData, activeLayout);  // after this, the Cytoscape instance `theCy` is alive
         toggleSwipes(theCy, extension_settings.timeline.autoExpandSwipes);
     }
     closeOpenDrawers();
@@ -1699,9 +1726,13 @@ async function onTimelineButtonClick() {
     // (this avoids some failed pans/zooms).
     setTimeout(() => {
         let textSearchElement = document.getElementById('transparent-search');
-        textSearchElement.focus();
-        textSearchElement.select();  // select content for easy erasing
-        zoomToCurrentChatNode(theCy);  // override the zoom-to-search
+        if (textSearchElement) {
+            textSearchElement.focus();
+            textSearchElement.select();  // select content for easy erasing
+        }
+        if (theCy) {
+            zoomToCurrentChatNode(theCy);  // override the zoom-to-search
+        }
         // textSearchElement.dispatchEvent(new Event('input'));  // no need to trigger input event to perform search, since now focusing the element already searches
     }, 500);
 }
@@ -1716,10 +1747,11 @@ async function onTimelineButtonClick() {
  * @returns {Promise<void>}
  */
 function slashCommandHandler(_, reload) {
-    if (reload == 'r') {
+    const force = (reload === 'r');
+    if (force) {
         lastContextKey = null;
     }
-    onTimelineButtonClick();
+    onTimelineButtonClick(force);
 }
 
 /**
@@ -1777,6 +1809,16 @@ jQuery(async () => {
         }
     }
 
+    async function updateCacheStatusUI() {
+        try {
+            const usage = await timelinesCache.getStorageUsage();
+            const kb = (usage.estimatedBytes / 1024).toFixed(1);
+            $('#timelinesCacheStatus').text(`已缓存 ${usage.chatCount} 个聊天记录，估算占用空间 ${kb} KB`);
+        } catch (e) {
+            $('#timelinesCacheStatus').text('无法读取缓存信息');
+        }
+    }
+
     $(document).ready(function () {
         $('#toggleStyleSettings').click(function () {
             $('#styleSettingsArea').toggleClass('hidden');
@@ -1784,6 +1826,30 @@ jQuery(async () => {
         $('#toggleColorSettings').click(function () {
             $('#colorSettingsArea').toggleClass('hidden');
         });
+        $('#toggleCacheSettings').click(function () {
+            $('#cacheSettingsArea').toggleClass('hidden');
+            if (!$('#cacheSettingsArea').hasClass('hidden')) {
+                updateCacheStatusUI();
+            }
+        });
+    });
+
+    $('#refreshCurrentCacheBtn').on('click', async function () {
+        const context = getTimelinesContext();
+        const scopeKey = !context.characterId
+            ? `group_${context.groupId || 'unknown'}`
+            : `char_${context.characterId ?? 'unknown'}`;
+        await timelinesCache.clearScope(scopeKey);
+        lastContextKey = null;
+        await updateCacheStatusUI();
+        toastr.info('当前角色本地缓存已清空，下次打开将重新获取。');
+    });
+
+    $('#clearAllCacheBtn').on('click', async function () {
+        await timelinesCache.clearAll();
+        lastContextKey = null;
+        await updateCacheStatusUI();
+        toastr.info('所有角色的时间线本地缓存已清空。');
     });
 
     $('#resetSettingsBtn').click(function () {
