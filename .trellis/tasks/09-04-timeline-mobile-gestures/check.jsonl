@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/luker-plugin-standards.md", "reason": "Ensure responsive components do not break mobile layout"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend quality and unit test execution"}

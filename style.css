@@ -43,6 +43,10 @@
     left: 0;
     right: 0;
     bottom: 0;
+    touch-action: none;
+    -webkit-touch-callout: none;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 #timelinesDiagramDiv.timelines-empty-state {
@@ -524,3 +528,74 @@
     opacity: 0.6;
     font-size: 0.9rem;
 }
+
+/* ==========================================================================
+   移动端响应式与触控增强 (Mobile Responsiveness & Touch Adjustments)
+   ========================================================================== */
+@media (max-width: 768px) {
+    #networkContainer {
+        width: 98vw;
+        height: 96vh;
+        padding: 8px;
+        border-radius: 8px;
+    }
+
+    /* 顶栏控制按钮触控热区优化（符合移动端 >= 38px 触控目标标准） */
+    .close,
+    .rotate,
+    .expand,
+    .reload,
+    .zoomtofit,
+    .zoomtocurrent {
+        font-size: 20px !important;
+        padding: 6px !important;
+        min-width: 38px !important;
+        min-height: 38px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    #transparent-search {
+        max-width: 130px;
+        font-size: 13px;
+        padding: 4px 8px;
+    }
+
+    /* 移动端长按上下文菜单尺寸与触控间距 */
+    .cy-context-menus-cxt-menu,
+    .timelines-cxt-menu {
+        min-width: 220px !important;
+        border-radius: 10px !important;
+    }
+
+    .cy-context-menus-cxt-menuitem,
+    .timelines-cxt-menuitem {
+        padding: 12px 18px !important;
+        font-size: 0.95rem !important;
+        min-height: 44px !important;
+    }
+
+    /* 移动端 Diff 对比弹窗自适应 */
+    .timelines-diff-dialog {
+        width: 98vw;
+        height: 96vh;
+        border-radius: 8px;
+    }
+
+    .timelines-diff-body {
+        flex-direction: column;
+        overflow-y: auto;
+    }
+
+    .timelines-diff-column {
+        border-right: none;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.12);
+        min-height: 48%;
+    }
+
+    .timelines-diff-column:last-child {
+        border-bottom: none;
+    }
+}
+

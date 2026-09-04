@@ -1002,6 +1002,10 @@ function initializeCytoscape(nodeData, styles, layoutConfig = layout) {
         textureOnViewport: true,
         hideEdgesOnViewport: true,
         pixelRatio: 'auto',
+        touchTapThreshold: 10,       // 优化移动端触控容错，防止微颤被误判为平移
+        desktopTapThreshold: 4,
+        boxSelectionEnabled: false,   // 禁用框选手势，避免与移动端单指平移冲突
+        autoungrabify: true,          // 锁定节点绝对位置，防止触屏拖拽画布时误拖动单个节点
     });
     theCy = cy;
 

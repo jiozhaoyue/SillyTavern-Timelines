@@ -143,11 +143,25 @@ export function initContextMenu(cy, { onReload } = {}) {
     ];
 
     try {
-        return cy.contextMenus({
+        const cxtInstance = cy.contextMenus({
             menuItems,
             menuItemClasses: ['timelines-cxt-menuitem'],
             contextMenuClasses: ['timelines-cxt-menu'],
         });
+
+        // 触控设备增强：支持手指长按节点时无缝在触点唤起上下文菜单
+        cy.on('taphold', 'node[?msg]', function (evt) {
+            const node = evt.target;
+            const pos = evt.renderedPosition || evt.position;
+            if (pos) {
+                node.emit('cxttap', {
+                    position: pos,
+                    renderedPosition: pos,
+                });
+            }
+        });
+
+        return cxtInstance;
     } catch (e) {
         console.warn('Timelines: 注册上下文菜单失败：', e);
         return null;
