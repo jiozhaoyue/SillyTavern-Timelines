@@ -52,3 +52,26 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 3: 移动端手势优化与小屏响应式适配
+<!-- trellis-session: v=2 fp=61507f5b66b4702d -->
+
+**Date**: 2026-09-04
+**Task**: 移动端手势优化与小屏响应式适配
+**Branch**: `codex-luker-chinese-refactor`
+
+### Summary
+
+优化 Cytoscape 移动端触控容错阈值与禁用框选冲突，通过 touch-action: none 解决捏合缩放劫持，实现长按呼出上下文菜单与顶栏控件及 Diff 弹窗的移动端响应式排版。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f5e9bbf` | feat(mobile): 优化移动端双指缩放、触控长按菜单与响应式小屏布局 |
+| `84abff4` | chore(task): archive 09-04-timeline-mobile-gestures |
+
+### Status
+
+[OK] **Completed**
