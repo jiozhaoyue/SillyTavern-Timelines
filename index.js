@@ -83,6 +83,7 @@ import { toggleGraphOrientation, highlightNodesByQuery, makeQueryFragments, setG
 import { debounce, escapeHtml, escapeRegExp, makeContextKey } from './src/helpers.js';
 import { layoutService } from './src/layout-service.js';
 import { timelinesCache } from './src/cache.js';
+import { initContextMenu } from './src/context-menu.js';
 import { registerSlashCommand } from '../../../slash-commands.js';
 import { fixMarkdown } from '../../../power-user.js';
 import { hideLoader, showLoader } from '../../../loader.js';
@@ -1549,6 +1550,11 @@ function renderCytoscapeDiagram(nodeData, customLayout = null) {
             cy.maxZoom(Number(extension_settings.timeline.maxZoom));
         }
         setupEventHandlers(cy, nodeData);
+        initContextMenu(cy, {
+            onReload: async (forceReload) => {
+                await onTimelineButtonClick(forceReload);
+            },
+        });
     }
 }
 

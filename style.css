@@ -251,6 +251,7 @@
 
 .tap_tippy_content {  /* 完整信息面板 */
     max-height: 75vh;
+    max-height: 75vh;
     max-width: 80vw;
     overflow: auto;
 }
@@ -272,4 +273,254 @@
     max-height: 50vh;
     max-width: 70vw;
     overflow-y: auto;
+}
+
+/* ==========================================================================
+   Cytoscape 上下文菜单美化 (Context Menu)
+   ========================================================================== */
+.cy-context-menus-cxt-menu,
+.timelines-cxt-menu {
+    display: none;
+    position: absolute;
+    z-index: 10002;
+    background-color: var(--SmartThemeBlurTintColor, rgba(20, 24, 35, 0.92)) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.18)) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
+    padding: 6px 0 !important;
+    min-width: 180px !important;
+    overflow: hidden !important;
+}
+
+.cy-context-menus-cxt-menuitem,
+.timelines-cxt-menuitem {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    padding: 8px 16px !important;
+    box-sizing: border-box !important;
+    background: transparent !important;
+    color: var(--SmartThemeBodyColor, #e0e0e0) !important;
+    font-size: 0.88rem !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    transition: background 0.15s ease, color 0.15s ease !important;
+    border: none !important;
+    outline: none !important;
+    text-align: left !important;
+}
+
+.cy-context-menus-cxt-menuitem:hover,
+.timelines-cxt-menuitem:hover {
+    background: rgba(255, 255, 255, 0.12) !important;
+    color: #ffffff !important;
+}
+
+.cy-context-menus-divider {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    margin: 4px 0 !important;
+}
+
+/* ==========================================================================
+   多分支差异对比模态框 (Branch Diff View)
+   ========================================================================== */
+.timelines-diff-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 10005;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.timelines-diff-backdrop.hidden {
+    display: none !important;
+}
+
+.timelines-diff-dialog {
+    width: 90vw;
+    max-width: 1200px;
+    height: 85vh;
+    background: var(--SmartThemeBlurTintColor, rgba(22, 27, 34, 0.95));
+    border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.2));
+    border-radius: 12px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.timelines-diff-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--SmartThemeBodyColor, #fff);
+}
+
+.timelines-diff-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.timelines-diff-close {
+    background: transparent;
+    border: none;
+    color: var(--SmartThemeBodyColor, #fff);
+    font-size: 1.2rem;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.15s ease;
+}
+
+.timelines-diff-close:hover {
+    opacity: 1;
+}
+
+.timelines-diff-lca {
+    background: rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 10px 20px;
+    font-size: 0.9rem;
+}
+
+.timelines-diff-lca .lca-title {
+    font-weight: 600;
+    color: var(--SmartThemeQuoteColor, #58a6ff);
+    margin-bottom: 4px;
+}
+
+.timelines-diff-lca .lca-content {
+    opacity: 0.85;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.timelines-diff-body {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+.timelines-diff-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+
+.timelines-diff-column:last-child {
+    border-right: none;
+}
+
+.timelines-diff-col-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.col-badge {
+    background: rgba(88, 166, 255, 0.2);
+    color: #58a6ff;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.col-name {
+    flex: 1;
+    margin: 0 10px;
+    font-size: 0.88rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.switch-branch-btn {
+    padding: 4px 10px !important;
+    font-size: 0.8rem !important;
+}
+
+.timelines-diff-message-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.timelines-diff-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 10px;
+    transition: transform 0.15s ease;
+}
+
+.timelines-diff-card.is-user {
+    border-left: 3px solid #58a6ff;
+}
+
+.timelines-diff-card.is-character {
+    border-left: 3px solid #3fb950;
+}
+
+.card-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 0.82rem;
+    opacity: 0.8;
+}
+
+.sender-name {
+    font-weight: 600;
+}
+
+.floor-badge {
+    opacity: 0.6;
+}
+
+.swipe-badge {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+}
+
+.card-text {
+    font-size: 0.88rem;
+    line-height: 1.5;
+    word-break: break-word;
+    white-space: pre-wrap;
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.timelines-diff-empty {
+    text-align: center;
+    padding: 40px 20px;
+    opacity: 0.6;
+    font-size: 0.9rem;
 }
