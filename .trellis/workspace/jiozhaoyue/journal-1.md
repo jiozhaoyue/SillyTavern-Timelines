@@ -223,3 +223,41 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 8: Session 8: 超大画幅高保真导出与长图分享系统
+<!-- trellis-session: v=2 fp=dd7d5b7094130680 -->
+
+**Date**: 2026-09-05
+**Task**: Session 8: 超大画幅高保真导出与长图分享系统
+**Branch**: `codex-luker-chinese-refactor`
+
+### Summary
+
+实现超大画幅长图海报与无损矢量SVG导出系统，支持自适应安全缩放防爆内存、离线元数据水印底栏合成、居中毛玻璃配置对话框、剪贴板写入与文件直接下载
+
+### Main Changes
+
+- 新增 export-service.js 实现 calculateSafeScale, composeMetadataBanner, exportTimelineAsPng 与无依赖 SVG 矢量生成器
+- 新增 export-modal.js 实现 timelines-export-backdrop 居中配置弹窗，支持 4 种规格、全卷/视口与背景底色切换
+- 更新 timeline.html, settings.html, style.css, index.js 增加 .export-timeline-btn 顶栏相机按钮与右键导出动作
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `71ddc46` | feat(export): 超大画幅高保真导出与长图分享系统 |
+| `2fce04f` | chore(task): archive 09-05-timeline-export-sharing |
+
+### Testing
+
+- [OK] 全量 54 项 Node.js 单元测试 100% 通过 (54/54 passed)
+- [OK] 通过 Chrome CDP 连接本地 Luker 实例端到端实机验证模态框弹出与 PNG/SVG 渲染，并留存高清截图
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 根据用户进一步需求，规划时间线分支折叠归档导出或更多剧本卡片分享玩法
