@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Ensure unit tests cover chapter segmentation, markdown outline formatting, and edge case topologies"}
+{"file": ".trellis/spec/frontend/luker-plugin-standards.md", "reason": "Ensure outline export adheres to SillyTavern UI standards and safe clipboard/download practices"}

@@ -34,7 +34,7 @@ function getNodeChatName(node) {
  * @param {Function} [callbacks.onReload] - 刷新图谱回调
  * @returns {Object|null}
  */
-export function initContextMenu(cy, { onReload, onExport } = {}) {
+export function initContextMenu(cy, { onReload, onExport, onOutline } = {}) {
   if (!cy || typeof cy.contextMenus !== 'function') {
     console.warn('Timelines: cy.contextMenus 扩展未就绪，跳过右键菜单初始化。');
     return null;
@@ -174,6 +174,17 @@ export function initContextMenu(cy, { onReload, onExport } = {}) {
       onClickFunction: () => {
         if (typeof onExport === 'function') {
           onExport();
+        }
+      },
+    },
+    {
+      id: 'tl-story-outline',
+      content: '📖 全局故事大纲与剧情摘要',
+      tooltipText: '提取章节时间轴、分歧点与台词摘要，支持 Markdown 导出',
+      selector: 'core',
+      onClickFunction: () => {
+        if (typeof onOutline === 'function') {
+          onOutline();
         }
       },
     },
