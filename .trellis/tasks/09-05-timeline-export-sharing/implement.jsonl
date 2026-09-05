@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Modal dialog component structure, styling and keyboard accessible patterns"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Zero coupling, non-destructive canvas export and test coverage guidelines"}

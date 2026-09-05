@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Ensure export engine performs safely without memory leakage or UI canvas disruptions"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "Validate parameter types and fallback guarantees for export options"}

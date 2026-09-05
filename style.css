@@ -310,6 +310,27 @@
   text-shadow: 0 0 12px rgba(56, 189, 248, 0.7);
 }
 
+/* 导出时间线海报与长图按钮 */
+.export-timeline-btn {
+  color: #aaaaaa;
+  float: right;
+  font-size: 24px;
+  font-weight: bold;
+  z-index: 3;
+  position: relative;
+  background: none;
+  border: none;
+  padding: 0;
+  padding-right: 10px;
+  transition: color 0.15s ease, text-shadow 0.15s ease;
+}
+.export-timeline-btn:hover {
+  color: #10b981;
+  text-decoration: none;
+  cursor: pointer;
+  text-shadow: 0 0 12px rgba(16, 185, 129, 0.7);
+}
+
 /* 全景小地图顶部折叠条 */
 .timelines-minimap-drawer {
   position: absolute;
@@ -943,7 +964,8 @@
   .toggle-minimap,
   .toggle-tags-drawer,
   .toggle-memory-milestones,
-  .toggle-lod-collapse {
+  .toggle-lod-collapse,
+  .export-timeline-btn {
     font-size: 20px !important;
     padding: 6px !important;
     min-width: 38px !important;
@@ -1230,5 +1252,193 @@
 .tl-palette-btn:hover {
   transform: scale(1.05);
 }
+
+/* ==========================================================================
+   导出配置模态框 (Export Modal)
+   ========================================================================== */
+.timelines-export-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 10005;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.timelines-export-modal {
+  position: relative;
+  width: 520px;
+  max-width: 95vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: rgba(22, 27, 34, 0.96);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65);
+  color: #e6edf3;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+.timelines-export-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.timelines-export-header h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #38bdf8;
+}
+
+.timelines-export-close {
+  background: none;
+  border: none;
+  color: #8b949e;
+  font-size: 1.15rem;
+  cursor: pointer;
+  padding: 4px;
+  transition: color 0.15s ease;
+}
+
+.timelines-export-close:hover {
+  color: #f85149;
+}
+
+.timelines-export-desc {
+  font-size: 0.86rem;
+  color: #8b949e;
+  line-height: 1.45;
+}
+
+.timelines-export-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.timelines-export-section.tl-flex-row {
+  flex-direction: row;
+  gap: 16px;
+}
+
+.timelines-export-section.tl-flex-row > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.timelines-export-label {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #c9d1d9;
+}
+
+.timelines-export-formats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.tl-format-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tl-format-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+.tl-format-card input[type="radio"] {
+  margin-top: 3px;
+  cursor: pointer;
+}
+
+.tl-format-card input[type="radio"]:checked ~ .tl-format-content .tl-format-name {
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.tl-format-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tl-format-name {
+  font-size: 0.88rem;
+  color: #e6edf3;
+}
+
+.tl-format-hint {
+  font-size: 0.74rem;
+  color: #8b949e;
+}
+
+.tl-select {
+  background: #0d1117;
+  color: #c9d1d9;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  outline: none;
+  cursor: pointer;
+}
+
+.tl-select:focus {
+  border-color: #38bdf8;
+}
+
+.tl-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: #8b949e;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tl-checkbox-label input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.tl-checkbox-label:hover {
+  color: #c9d1d9;
+}
+
+.timelines-export-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+
 
 

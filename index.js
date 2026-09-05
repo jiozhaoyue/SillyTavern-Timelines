@@ -101,6 +101,7 @@ import { debounce, escapeHtml, escapeRegExp, makeContextKey } from './src/helper
 import { layoutService } from './src/layout-service.js';
 import { Minimap } from './src/minimap.js';
 import { applyLodToElements } from './src/lod-service.js';
+import { openExportModal } from './src/export-modal.js';
 import { fetchData, prepareData } from './src/node-data.js';
 import { highlightElements, restoreElements, setupStylesAndData } from './src/style.js';
 import { closeModal, closeOpenDrawers, closeTippy, handleModalDisplay, navigateToMessage } from './src/utils.js';
@@ -1448,6 +1449,13 @@ function setupEventHandlers(cy, nodeData) {
     };
   }
 
+  let exportBtn = modal.getElementsByClassName('export-timeline-btn')[0];
+  if (exportBtn) {
+    exportBtn.onclick = function () {
+      openExportModal(cy, getTimelinesContext());
+    };
+  }
+
   // Next, attach some Cytoscape event listeners.
 
   cy.on('zoom', debounce(() => {
@@ -1759,6 +1767,9 @@ function renderCytoscapeDiagram(nodeData, customLayout = null) {
     initContextMenu(cy, {
       onReload: async forceReload => {
         await onTimelineButtonClick(forceReload);
+      },
+      onExport: () => {
+        openExportModal(cy, getTimelinesContext());
       },
     });
 

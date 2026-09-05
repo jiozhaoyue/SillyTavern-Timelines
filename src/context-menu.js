@@ -34,7 +34,7 @@ function getNodeChatName(node) {
  * @param {Function} [callbacks.onReload] - 刷新图谱回调
  * @returns {Object|null}
  */
-export function initContextMenu(cy, { onReload } = {}) {
+export function initContextMenu(cy, { onReload, onExport } = {}) {
   if (!cy || typeof cy.contextMenus !== 'function') {
     console.warn('Timelines: cy.contextMenus 扩展未就绪，跳过右键菜单初始化。');
     return null;
@@ -144,57 +144,6 @@ export function initContextMenu(cy, { onReload } = {}) {
         });
       },
     },
-    {
-      id: 'tl-mark-diff-a',
-      content: '📌 设为对比基准 A',
-      tooltipText: '暂存该分支节点作为后续 Diff 对比的起点',
-      selector: 'node[?msg]',
-      onClickFunction: event => {
-        diffBaseNodeA = event.target || event.cyTarget;
-        const name = getNodeChatName(diffBaseNodeA);
-        toastr.info(`已将 [${name}] 设为对比基准 A。请右键另一个分支节点选择“与基准 A 对比”。`);
-      },
-    },
-    {
-      id: 'tl-diff-with-a',
-      content: '⚖️ 与对比基准 A 对比 (Diff)',
-      tooltipText: '计算两分支分叉点及各自后续走向差异',
-      selector: 'node[?msg]',
-      show: true,
-      onClickFunction: event => {
-        const targetNode = event.target || event.cyTarget;
-        if (!diffBaseNodeA) {
-          toastr.warning('请先右键一个节点选择“设为对比基准 A”。');
-          return;
-        }
-
-        try {
-          const pathA = extractPathToRoot(diffBaseNodeA);
-          const pathB = extractPathToRoot(targetNode);
-          const diffResult = computeBranchLCA(pathA, pathB);
-          const nameA = getNodeChatName(diffBaseNodeA);
-          const nameB = getNodeChatName(targetNode);
-          showDiffModal(diffResult, nameA, nameB);
-        } catch (err) {
-          console.error('Timelines: 计算分支差异异常：', err);
-          toastr.error('计算分支差异失败');
-        }
-      },
-    },
-    {
-      id: 'tl-delete-branch',
-      content: '🗑️ 删除此会话分支',
-      tooltipText: '永久删除此节点所属的会话文件 (带二次确认)',
-      selector: 'node[?msg]',
-      onClickFunction: async event => {
-        const node = event.target || event.cyTarget;
-        await branchManager.deleteBranchFromNode(node, async () => {
-          if (typeof onReload === 'function') {
-            await onReload(true);
-          }
-        });
-      },
-    },
     // 空白画布菜单
     {
       id: 'tl-fit-canvas',
@@ -214,6 +163,17 @@ export function initContextMenu(cy, { onReload } = {}) {
       onClickFunction: async () => {
         if (typeof onReload === 'function') {
           await onReload(true);
+        }
+      },
+    },
+    {
+      id: 'tl-export-canvas',
+      content: '📷 导出时间线海报与长图',
+      tooltipText: '配置并导出超大画幅长图海报或矢量 SVG',
+      selector: 'core',
+      onClickFunction: () => {
+        if (typeof onExport === 'function') {
+          onExport();
         }
       },
     },
