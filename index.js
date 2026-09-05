@@ -105,6 +105,7 @@ import { openExportModal } from './src/export-modal.js';
 import { openStoryOutlineModal } from './src/story-outline-modal.js';
 import { openAnalyticsModal } from './src/analytics-modal.js';
 import { openSnapshotGalleryModal } from './src/snapshot-modal.js';
+import { SearchRadar } from './src/search-radar.js';
 import { fetchData, prepareData } from './src/node-data.js';
 import { highlightElements, restoreElements, setupStylesAndData } from './src/style.js';
 import { closeModal, closeOpenDrawers, closeTippy, handleModalDisplay, navigateToMessage } from './src/utils.js';
@@ -153,6 +154,7 @@ let lastTimelineData = null; // 最近一次取回并整理好的时间线数据
 let theCy = null; // Cytoscape 实例
 let minimapInstance = null; // 全景小地图实例
 let tagsDrawerInstance = null; // 书签与彩色标签抽屉实例
+let searchRadarInstance = null; // 智能全景雷达与多维检索器实例
 let expandedClusterIds = new Set(); // 用户手动展开的 LOD 折叠段落
 let isLodCollapsedActive = true; // 抽稀折叠是否处于激活态
 
@@ -1770,6 +1772,10 @@ function renderCytoscapeDiagram(nodeData, customLayout = null) {
     tagsDrawerInstance.destroy();
     tagsDrawerInstance = null;
   }
+  if (searchRadarInstance) {
+    searchRadarInstance.clear();
+    searchRadarInstance = null;
+  }
   if (theCy) {
     theCy.destroy();
     theCy = null;
@@ -1809,6 +1815,7 @@ function renderCytoscapeDiagram(nodeData, customLayout = null) {
     const networkContainer = document.getElementById('networkContainer');
     minimapInstance = new Minimap(cy, networkContainer);
     tagsDrawerInstance = new TagsDrawer(cy, networkContainer);
+    searchRadarInstance = new SearchRadar(cy, document.getElementById('dialogue_deluxe') || document);
 
     // 1. 同步时间树拓扑状态供外部 API 导出读取
     const currentContext = getTimelinesContext();

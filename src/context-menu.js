@@ -210,6 +210,19 @@ export function initContextMenu(cy, { onReload, onExport, onOutline, onAnalytics
         }
       },
     },
+    {
+      id: 'tl-search-radar',
+      content: '🔍 聚焦智能检索雷达 [Ctrl+Shift+F]',
+      tooltipText: '聚焦多维搜索输入框，开启正则与条件筛选',
+      selector: 'core',
+      onClickFunction: () => {
+        const input = document.getElementById('transparent-search');
+        if (input) {
+          input.focus();
+          input.select();
+        }
+      },
+    },
   ];
 
   try {
