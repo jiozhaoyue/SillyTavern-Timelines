@@ -259,6 +259,18 @@ export function createNode(nodeId, messageId, text, group, allChatFileNamesAndLe
     };
   }
 
+  let extra = group[0]?.message?.extra || {};
+  let tags = extra.tags || [];
+  if (!tags || tags.length === 0) {
+    for (const item of group) {
+      if (item.message?.extra?.tags && item.message.extra.tags.length > 0) {
+        tags = item.message.extra.tags;
+        extra = item.message.extra;
+        break;
+      }
+    }
+  }
+
   return {
     id: nodeId,
     msg: text,
@@ -273,6 +285,8 @@ export function createNode(nodeId, messageId, text, group, allChatFileNamesAndLe
     send_date: send_date,
     color: isBookmark ? generateUniqueColor(text) : null,
     chat_sessions: chat_sessions,
+    extra: extra,
+    tags: tags,
   };
 }
 

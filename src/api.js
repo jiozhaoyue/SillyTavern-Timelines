@@ -4,7 +4,7 @@
  * Luker.getContext().registerExtensionApi('timelines', api)
  *
  * 供其他插件（如向量检索、记忆插件、分支分析工具）主动读取时间树拓扑、
- * 追溯因果祖先链与计算最近公共祖先 (LCA)。
+ * 追溯因果祖先链、计算最近公共祖先 (LCA)，并通过微内核装饰器机制扩展节点渲染。
  */
 
 /**
@@ -104,6 +104,74 @@ let _currentGraphElements = [];
 let _activeChatFileName = '';
 const _branchSwitchListeners = new Set();
 
+// 微内核装饰器与动态扩展注册表
+const _nodeDecorators = new Map();
+const _toolbarActions = new Map();
+const _contextMenuActions = [];
+
+/**
+ * 注册通用节点修饰器
+ * @param {object} decorator
+ * @param {string} decorator.id - 唯一标识
+ * @param {number} [decorator.priority=10] - 优先级（数值越小越先执行）
+ * @param {Function} [decorator.decorateNode] - (cyNode, nodeData) => void
+ * @param {Function} [decorator.getTooltipPrefix] - (cyNode) => string
+ * @param {Function} [decorator.getCardSection] - (cyNode) => string (HTML)
+ * @param {Function} [decorator.isProtected] - (nodeData) => boolean
+ */
+export function registerNodeDecorator(decorator) {
+  if (!decorator || !decorator.id) return false;
+  _nodeDecorators.set(decorator.id, {
+    priority: 10,
+    ...decorator,
+  });
+  return true;
+}
+
+export function unregisterNodeDecorator(id) {
+  return _nodeDecorators.delete(id);
+}
+
+export function getNodeDecorators() {
+  return Array.from(_nodeDecorators.values()).sort((a, b) => a.priority - b.priority);
+}
+
+/**
+ * 注册顶栏控制动作
+ * @param {object} action
+ * @param {string} action.id
+ * @param {string} action.title
+ * @param {string} action.iconClass
+ * @param {Function} action.onToggle - (active, cy) => void
+ */
+export function registerToolbarAction(action) {
+  if (!action || !action.id) return false;
+  _toolbarActions.set(action.id, action);
+  return true;
+}
+
+export function getToolbarActions() {
+  return Array.from(_toolbarActions.values());
+}
+
+/**
+ * 注册右键菜单动作
+ * @param {object} action
+ * @param {string} action.id
+ * @param {string} action.content
+ * @param {Function} action.onClick - (cyNode) => void
+ * @param {string} [action.selector='node']
+ */
+export function registerContextMenuAction(action) {
+  if (!action || !action.id) return false;
+  _contextMenuActions.push(action);
+  return true;
+}
+
+export function getContextMenuActions() {
+  return [..._contextMenuActions];
+}
+
 /**
  * 更新 Timelines 当前内存中的图谱与活动会话状态（供 timeline.js 驱动调用）
  * @param {Array<object>} elements
@@ -143,55 +211,68 @@ export function registerTimelinesExtensionApi(customContext = null) {
       }
 
       const timelinesApi = {
-        version: '1.2.0',
-      /**
-       * 获取当前时间树图谱的所有 Cytoscape 元素拓扑
-       */
-      getTimelineTree: () => {
-        return structuredClone ? structuredClone(_currentGraphElements) : JSON.parse(JSON.stringify(_currentGraphElements));
-      },
+        version: '1.3.0',
+        /**
+         * 获取当前时间树图谱的所有 Cytoscape 元素拓扑
+         */
+        getTimelineTree: () => {
+          return structuredClone ? structuredClone(_currentGraphElements) : JSON.parse(JSON.stringify(_currentGraphElements));
+        },
 
-      /**
-       * 追溯指定节点从根到自身的因果祖先链
-       * @param {string} nodeId
-       */
-      getBranchLineage: (nodeId) => {
-        return getLineageFromElements(_currentGraphElements, nodeId);
-      },
+        /**
+         * 追溯指定节点从根到自身的因果祖先链
+         * @param {string} nodeId
+         */
+        getBranchLineage: (nodeId) => {
+          return getLineageFromElements(_currentGraphElements, nodeId);
+        },
 
-      /**
-       * 计算两个时间树节点的最近公共祖先 (LCA)
-       * @param {string} nodeAId
-       * @param {string} nodeBId
-       */
-      computeBranchLCA: (nodeAId, nodeBId) => {
-        const lineageA = getLineageFromElements(_currentGraphElements, nodeAId);
-        const lineageB = getLineageFromElements(_currentGraphElements, nodeBId);
-        return computeLowestCommonAncestor(lineageA, lineageB);
-      },
+        /**
+         * 计算两个时间树节点的最近公共祖先 (LCA)
+         * @param {string} nodeAId
+         * @param {string} nodeBId
+         */
+        computeBranchLCA: (nodeAId, nodeBId) => {
+          const lineageA = getLineageFromElements(_currentGraphElements, nodeAId);
+          const lineageB = getLineageFromElements(_currentGraphElements, nodeBId);
+          return computeLowestCommonAncestor(lineageA, lineageB);
+        },
 
-      /**
-       * 获取当前活动分支的所有消息节点（按楼层排序）
-       * @param {string} [chatFileName] - 缺省则为当前打开的分支
-       */
-      getBranchNodes: (chatFileName = null) => {
-        const target = chatFileName || _activeChatFileName;
-        return getChatBranchNodes(_currentGraphElements, target);
-      },
+        /**
+         * 获取当前活动分支的所有消息节点（按楼层排序）
+         * @param {string} [chatFileName] - 缺省则为当前打开的分支
+         */
+        getBranchNodes: (chatFileName = null) => {
+          const target = chatFileName || _activeChatFileName;
+          return getChatBranchNodes(_currentGraphElements, target);
+        },
 
-      /**
-       * 监听用户在时间树中切换分支事件
-       * @param {Function} callback - ({ chatFileName, nodeId }) => void
-       * @returns {Function} 取消监听函数
-       */
-      onBranchSwitched: (callback) => {
-        if (typeof callback === 'function') {
-          _branchSwitchListeners.add(callback);
-          return () => _branchSwitchListeners.delete(callback);
-        }
-        return () => {};
-      },
-    };
+        /**
+         * 监听用户在时间树中切换分支事件
+         * @param {Function} callback - ({ chatFileName, nodeId }) => void
+         * @returns {Function} 取消监听函数
+         */
+        onBranchSwitched: (callback) => {
+          if (typeof callback === 'function') {
+            _branchSwitchListeners.add(callback);
+            return () => _branchSwitchListeners.delete(callback);
+          }
+          return () => {};
+        },
+
+        // 微内核装饰器与动态动作扩展总线
+        registerNodeDecorator,
+        unregisterNodeDecorator,
+        getNodeDecorators,
+        registerToolbarAction,
+        getToolbarActions,
+        registerContextMenuAction,
+        getContextMenuActions,
+      };
+
+      if (typeof window !== 'undefined') {
+        window.TimelinesExtensionApi = timelinesApi;
+      }
 
       ctx.registerExtensionApi('timelines', Object.freeze(timelinesApi));
       return true;

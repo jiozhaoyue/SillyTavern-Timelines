@@ -286,6 +286,28 @@ export function setupStylesAndData(nodeData) {
                 'width': 2,
             },
         },
+        {
+            selector: 'node.has-custom-tags',
+            style: {
+                'border-color': 'data(primaryTagColor)',
+                'border-width': 4,
+                'border-opacity': 1,
+                'underlay-color': 'data(primaryTagColor)',
+                'underlay-padding': '3px',
+                'underlay-opacity': 0.35,
+                'underlay-shape': 'ellipse',
+            },
+        },
+        {
+            selector: 'node.tl-node-pulse',
+            style: {
+                'underlay-color': '#f59e0b',
+                'underlay-padding': '8px',
+                'underlay-opacity': 0.85,
+                'underlay-shape': 'ellipse',
+                'z-index': 99,
+            },
+        },
     ];
 
     return cytoscapeStyles;

@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "Microkernel extension bus and native SillyTavern message state management rules"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Zero coupling, non-destructive native chat contract, and unit testing guidelines"}

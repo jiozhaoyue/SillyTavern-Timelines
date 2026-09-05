@@ -17,10 +17,12 @@ export function isProtectedNode(node, protectedNodeIds = new Set()) {
     const id = d.id;
 
     if (protectedNodeIds && protectedNodeIds.has(id)) return true;
+    if (d.isProtected) return true;
     if (d.label === 'root' || d.isRoot) return true;
     if (d.isBookmark) return true;
-    if (d.hasMemory || d.injectionStatus) return true;
     if (d.isCurrent || d.isActive) return true;
+    // 兼容通用标记及历史字段
+    if (d.hasMemory || d.hasTags) return true;
     // 多 swipe 分支的首节点或用户正在查看的 swipe
     if (d.isSwipe || (typeof d.totalSwipes === 'number' && d.totalSwipes > 1)) return true;
 
