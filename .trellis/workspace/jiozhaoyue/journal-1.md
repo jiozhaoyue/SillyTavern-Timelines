@@ -413,3 +413,41 @@
 ### Next Steps
 
 - 继续按 /goal 自主推进：智能全景雷达与多维复合检索器 (smart-search-radar)
+
+
+## Session 13: Session 13: 智能全景雷达与多维复合检索器
+<!-- trellis-session: v=2 fp=f758fe67fbfa7cd9 -->
+
+**Date**: 2026-09-05
+**Task**: Session 13: 智能全景雷达与多维复合检索器
+**Branch**: `codex-luker-chinese-refactor`
+
+### Summary
+
+实现支持正则表达式、角色切片、书签、彩色标签、Swipes 重试与楼层范围的多维复合检索器，并提供步进器遍历跳跃、全图半透明调光与发光脉冲聚焦
+
+### Main Changes
+
+- 新增 src/search-service.js 纯函数实现正则解析与复合过滤算法
+- 新增 src/search-radar.js 实现悬浮步进器、结果计数徽章、筛选气泡面板与视口脉冲调度
+- 在 src/context-menu.js, style.css, index.js 增加雷达控制条样式、快捷键聚焦与调光样式
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2a7c69b` | feat(search): 智能全景雷达与多维复合检索器 |
+| `22614f3` | chore(task): archive 09-05-smart-search-radar |
+
+### Testing
+
+- [OK] 全量 78 项单元测试 100% 通过 (tests/search-radar.test.mjs)
+- [OK] 通过 Chrome CDP 在 Luker 实例端到端自动化验证搜索框与复合筛选面板弹出并截留验证图 luker_timelines_radar_verified.png
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 完成项目终极全景功能文档 Wiki (WIKI.md 与 docs/) 并做最终交付
