@@ -75,3 +75,42 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 4: 完成时间树全景小地图与鸟瞰拖拽导航 (09-05-timeline-minimap-navigation)
+<!-- trellis-session: v=2 fp=99ad188fabe72714 -->
+
+**Date**: 2026-09-05
+**Task**: 完成时间树全景小地图与鸟瞰拖拽导航 (09-05-timeline-minimap-navigation)
+**Branch**: `codex-luker-chinese-refactor`
+
+### Summary
+
+实现了顶部折叠式全景小地图抽屉组件，集成高保真双缓冲 Canvas 渲染、视口取景框联动与拖拽居中平移，修复了 convertToCytoscapeElements 与 Worker postMessage 序列化，完成实机 1807 节点自动化 CDP 验证。
+
+### Main Changes
+
+- 实现 src/minimap-math.js 纯数学投影转换与视口取景框几何计算
+- 实现 src/minimap.js 顶部折叠抽屉与双缓冲离屏拓扑渲染
+- 在 style.css 与 settings.html 增加顶部折叠抽屉美化样式与地图切换按钮
+- 修复 src/node-data.js 与 src/graph-builder.js 中的 convertToCytoscapeElements 导出
+- 修复 src/layout-service.js 中的 postMessage 序列化（过滤不可克隆函数）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c7380b7` | feat(minimap): 添加顶部折叠式时间树全景小地图与鸟瞰视口导航 |
+
+### Testing
+
+- [OK] 自动化单元测试 30/30 项全绿 (tests/*.test.mjs)
+- [OK] CDP 实机自动化测试通过，成功在 1807 节点图上展开小地图、验证像素渲染 (101760 像素全部有效)、执行点击跳转导航与截图
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 头脑风暴下一阶段功能（如：智能分支标签、全文搜索结果聚类与多路线导出等）
