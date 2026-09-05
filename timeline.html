@@ -1,4 +1,4 @@
-<div id="timelines_container" class="extension_container" data-extension-name="SillyTavern-Timelines">
+<div id="timelines_container" class="extension_container">
   <div class="timeline-view-settings">
     <div class="inline-drawer">
       <div class="inline-drawer-toggle inline-drawer-header">
@@ -269,7 +269,6 @@
             <toolcool-color-picker id="char-node-color-picker" value="#FFFFFF"></toolcool-color-picker>
             <span data-i18n="角色节点颜色">角色节点颜色</span>
           </div>
-          <div class="timeline-view-settings_block flex-container"></div>
           <div class="timeline-view-settings_block flex-container">
             <toolcool-color-picker id="user-node-color-picker" value="#ADD8E6"></toolcool-color-picker>
             <span data-i18n="用户节点颜色">用户节点颜色</span>
@@ -277,40 +276,6 @@
           <div class="timeline-view-settings_block flex-container">
             <toolcool-color-picker id="edge-color-picker" value="#555"></toolcool-color-picker>
             <span data-i18n="边颜色">边颜色</span>
-          </div>
-        </div>
-        <div class="timeline-view-settings_block flex-container">
-          <input
-            value="缓存管理"
-            class="menu_button"
-            type="button"
-            id="toggleCacheSettings"
-            title="管理时间线本地持久化缓存（IndexedDB）与同步设置。"
-            data-i18n="[title]管理时间线本地持久化缓存（IndexedDB）与同步设置。"
-          />
-        </div>
-        <div id="cacheSettingsArea" class="hidden">
-          <div
-            class="timeline-view-settings_block flex-container"
-            style="justify-content: space-between; align-items: center"
-          >
-            <span id="timelinesCacheStatus" style="font-size: 0.9em; opacity: 0.8">缓存状态：正在读取...</span>
-          </div>
-          <div class="timeline-view-settings_block flex-container" style="gap: 8px">
-            <input
-              id="refreshCurrentCacheBtn"
-              class="menu_button"
-              type="button"
-              value="刷新当前角色缓存"
-              title="清除当前角色的本地缓存，并在下次打开时重新全量拉取。"
-            />
-            <input
-              id="clearAllCacheBtn"
-              class="menu_button"
-              type="button"
-              value="清空全部缓存"
-              title="清除所有角色的 IndexedDB 本地缓存。"
-            />
           </div>
         </div>
         <div class="timeline-view-settings_block flex-container">

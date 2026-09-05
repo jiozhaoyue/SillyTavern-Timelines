@@ -106,13 +106,28 @@ class LayoutService {
                 },
             });
 
-            worker.postMessage({
-                id,
-                type: 'CALCULATE_LAYOUT',
-                nodes,
-                edges,
-                layoutOptions,
-            });
+            // 过滤掉不可序列化的函数，避免 postMessage 触发 DataCloneError
+            const serializableOptions = {};
+            for (const [k, v] of Object.entries(layoutOptions || {})) {
+                if (typeof v !== 'function') {
+                    serializableOptions[k] = v;
+                }
+            }
+
+            try {
+                worker.postMessage({
+                    id,
+                    type: 'CALCULATE_LAYOUT',
+                    nodes,
+                    edges,
+                    layoutOptions: serializableOptions,
+                });
+            } catch (err) {
+                clearTimeout(timer);
+                this._pendingRequests.delete(id);
+                console.warn('Timelines: 发送 Worker 布局任务失败：', err);
+                resolve({ success: false, positions: null });
+            }
         });
     }
 
