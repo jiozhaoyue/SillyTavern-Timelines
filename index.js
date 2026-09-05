@@ -103,6 +103,7 @@ import { Minimap } from './src/minimap.js';
 import { applyLodToElements } from './src/lod-service.js';
 import { openExportModal } from './src/export-modal.js';
 import { openStoryOutlineModal } from './src/story-outline-modal.js';
+import { openAnalyticsModal } from './src/analytics-modal.js';
 import { fetchData, prepareData } from './src/node-data.js';
 import { highlightElements, restoreElements, setupStylesAndData } from './src/style.js';
 import { closeModal, closeOpenDrawers, closeTippy, handleModalDisplay, navigateToMessage } from './src/utils.js';
@@ -1464,6 +1465,13 @@ function setupEventHandlers(cy, nodeData) {
     };
   }
 
+  let analyticsBtn = modal.getElementsByClassName('toggle-timeline-analytics')[0];
+  if (analyticsBtn) {
+    analyticsBtn.onclick = function () {
+      openAnalyticsModal(cy);
+    };
+  }
+
   // Next, attach some Cytoscape event listeners.
 
   cy.on('zoom', debounce(() => {
@@ -1781,6 +1789,9 @@ function renderCytoscapeDiagram(nodeData, customLayout = null) {
       },
       onOutline: () => {
         openStoryOutlineModal(cy, getTimelinesContext());
+      },
+      onAnalytics: () => {
+        openAnalyticsModal(cy);
       },
     });
 

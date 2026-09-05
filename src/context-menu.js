@@ -34,7 +34,7 @@ function getNodeChatName(node) {
  * @param {Function} [callbacks.onReload] - 刷新图谱回调
  * @returns {Object|null}
  */
-export function initContextMenu(cy, { onReload, onExport, onOutline } = {}) {
+export function initContextMenu(cy, { onReload, onExport, onOutline, onAnalytics } = {}) {
   if (!cy || typeof cy.contextMenus !== 'function') {
     console.warn('Timelines: cy.contextMenus 扩展未就绪，跳过右键菜单初始化。');
     return null;
@@ -185,6 +185,17 @@ export function initContextMenu(cy, { onReload, onExport, onOutline } = {}) {
       onClickFunction: () => {
         if (typeof onOutline === 'function') {
           onOutline();
+        }
+      },
+    },
+    {
+      id: 'tl-analytics',
+      content: '📊 剧情量化统计与全景看板',
+      tooltipText: '量化分析分支深度、发言天平、Swipes 探索率与标签排行',
+      selector: 'core',
+      onClickFunction: () => {
+        if (typeof onAnalytics === 'function') {
+          onAnalytics();
         }
       },
     },
