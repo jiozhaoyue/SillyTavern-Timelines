@@ -114,3 +114,40 @@
 ### Next Steps
 
 - 头脑风暴下一阶段功能（如：智能分支标签、全文搜索结果聚类与多路线导出等）
+
+
+## Session 5: 时间树与 Luker 记忆图 (memory-graph) 主动深度联动与 API 暴露
+<!-- trellis-session: v=2 fp=d958baddb44d4b3c -->
+
+**Date**: 2026-09-05
+**Task**: 时间树与 Luker 记忆图 (memory-graph) 主动深度联动与 API 暴露
+**Branch**: `codex-luker-chinese-refactor`
+
+### Summary
+
+实现时间树与 Luker 官方 memory-graph 扩展的主动双向联动与状态感知，暴露 timelines 扩展查询 API，并通过 37 项单元测试及 CDP 实机端到端验证。
+
+### Main Changes
+
+- 新增 src/memory-graph-service.js：实现 memory-graph 扩展总线发现、注入状态计算与安全优雅降级
+- 新增 src/api.js：暴露 timelines 标准扩展查询接口 (LCA、Lineage、Tree、Branch)
+- 增强 UI 与右键菜单：节点记忆徽章、Tap 记忆卡片、右键查看/补录记忆模态框、记忆里程碑过滤按钮
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `50e6186` | feat(memory-graph): 时间树与 Luker 记忆图 (memory-graph) 主动深度联动与 API 暴露 |
+
+### Testing
+
+- [OK] 通过 37/37 项全量单元测试 (node --test tests/*.test.mjs)
+- [OK] 通过 Chrome CDP 在 live Luker (https://127.0.0.1:8003) 完成端到端 UI 与 API 验证
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 根据用户规划推进下一阶段需求
