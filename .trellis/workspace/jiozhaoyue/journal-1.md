@@ -375,3 +375,41 @@
 ### Next Steps
 
 - 继续按 /goal 自主推进：时光机快照与分支存档管理 (branch-snapshots)
+
+
+## Session 12: Session 12: 分支检查点快照与时光机存档画廊管理
+<!-- trellis-session: v=2 fp=324dc5650e3fd4f0 -->
+
+**Date**: 2026-09-05
+**Task**: Session 12: 分支检查点快照与时光机存档画廊管理
+**Branch**: `codex-luker-chinese-refactor`
+
+### Summary
+
+实现全时间树书签与关键分歧快照自动扫描聚合、时光机画廊纵向时间轴展示、模糊搜索过滤、视口节点极速跳跃聚焦与跨分支会话时空穿越
+
+### Main Changes
+
+- 新增 src/snapshot-service.js 实现快照提取、排序、过滤与 Markdown 导出
+- 新增 src/snapshot-modal.js 实现玻璃拟态时光机卡片流、视口定位与 openCharacterChat 穿越
+- 在 timeline.html, settings.html, src/context-menu.js, style.css 增加时光机入口与样式
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cc4db83` | feat(snapshots): 分支检查点快照与时光机存档画廊管理 |
+| `294b9f8` | chore(task): archive 09-05-branch-snapshots |
+
+### Testing
+
+- [OK] 全量 74 项单元测试 100% 通过 (tests/snapshots.test.mjs)
+- [OK] 通过 Chrome CDP 在 Luker 实例端到端自动化验证时光机画廊渲染并截留验证图 luker_timelines_snapshots_verified.png
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 继续按 /goal 自主推进：智能全景雷达与多维复合检索器 (smart-search-radar)
