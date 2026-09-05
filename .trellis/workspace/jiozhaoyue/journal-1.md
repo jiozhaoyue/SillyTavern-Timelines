@@ -261,3 +261,41 @@
 ### Next Steps
 
 - 根据用户进一步需求，规划时间线分支折叠归档导出或更多剧本卡片分享玩法
+
+
+## Session 9: Session 9: 分支剧情树深度差异化分析与一键跨分支合并
+<!-- trellis-session: v=2 fp=dddfaefede53b91c -->
+
+**Date**: 2026-09-05
+**Task**: Session 9: 分支剧情树深度差异化分析与一键跨分支合并
+**Branch**: `codex-luker-chinese-refactor`
+
+### Summary
+
+实现分支剧情树深度差异化分析、逐轮对齐、关键指标统计、单消息卡片一键采摘 (Cherry-Pick) 与基于分叉点 LCA 派生合并新会话系统，100% 遵从酒馆原生消息规范
+
+### Main Changes
+
+- 新增 merge-service.js 实现 cloneNativeMessage, cherryPickMessageToCurrentChat, synthesizeMergedChatSequence 与 generateMergeBranchName
+- 重构 diff-modal.js 增加统计指标栏、双栏单消息 Cherry-Pick 采摘按钮与反馈动效、基于 LCA 派生合并分支流程
+- 更新 style.css 为差异对比浮层增加 Cherry-Pick 采摘微动效、合并按钮与统计指标样式
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9f23805` | feat(diff-merge): 分支剧情树深度差异化分析与一键跨分支合并 |
+| `f0d17fc` | chore(task): archive 09-05-branch-diff-merge |
+
+### Testing
+
+- [OK] 全量 60 项 Node.js 单元测试 100% 通过 (60/60 passed，新增 tests/merge.test.mjs)
+- [OK] 通过 Chrome CDP 连接本地 Luker 实例端到端实机验证 Diff 面板唤起与单消息采摘至第 5 楼，并留存高清截图
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 探索基于时间线的故事大纲全局视图、剧情关键节点摘要与更多智能化排版功能
