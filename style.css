@@ -807,6 +807,32 @@
   opacity: 1;
 }
 
+.timelines-diff-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tl-merge-branches-btn {
+  background: #0284c7 !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 6px !important;
+  padding: 6px 14px !important;
+  font-size: 0.82rem !important;
+  font-weight: 500 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+.tl-merge-branches-btn:hover {
+  background: #0369a1 !important;
+  box-shadow: 0 0 10px rgba(2, 132, 199, 0.5) !important;
+}
+
 .timelines-diff-lca {
   background: rgba(255, 255, 255, 0.04);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -825,6 +851,27 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.timelines-diff-stats {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 8px 20px;
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.timelines-diff-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.timelines-diff-stat-item b {
+  color: #f1f5f9;
 }
 
 .timelines-diff-body {
@@ -934,6 +981,43 @@
   white-space: pre-wrap;
   max-height: 240px;
   overflow-y: auto;
+}
+
+.card-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tl-cherry-pick-btn {
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #34d399;
+  border-radius: 5px;
+  padding: 4px 10px;
+  font-size: 0.76rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+
+.tl-cherry-pick-btn:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.28);
+  border-color: #10b981;
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+}
+
+.tl-cherry-pick-btn.picked {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #38bdf8;
+  cursor: default;
 }
 
 .timelines-diff-empty {

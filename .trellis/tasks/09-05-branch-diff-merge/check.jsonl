@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/luker-plugin-standards.md", "reason": "Verify alignment with SillyTavern / Luker native chat file storage contracts and event dispatching"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Verify complete unit test coverage for merge algorithms, cherry-pick operations, and edge-cases"}
