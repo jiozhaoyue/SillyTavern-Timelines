@@ -299,3 +299,41 @@
 ### Next Steps
 
 - 探索基于时间线的故事大纲全局视图、剧情关键节点摘要与更多智能化排版功能
+
+
+## Session 10: Session 10: 时间线全局故事大纲视图与关键剧情摘要卡片流导出
+<!-- trellis-session: v=2 fp=a80c07b39f412b45 -->
+
+**Date**: 2026-09-05
+**Task**: Session 10: 时间线全局故事大纲视图与关键剧情摘要卡片流导出
+**Branch**: `codex-luker-chinese-refactor`
+
+### Summary
+
+实现主线故事大纲智能分章聚合提取、剧情卡片流与双向视口脉冲聚焦联动、GFM Markdown 导出与下载功能
+
+### Main Changes
+
+- 新增 src/story-outline-service.js 实现分章聚合、主干追踪与 Markdown 序列化
+- 新增 src/story-outline-modal.js 实现章节导航侧边栏、卡片流双向脉冲聚焦与导出
+- 在 timeline.html, settings.html, src/context-menu.js, style.css 增加故事大纲入口与响应式样式
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8b24021` | feat(outline): 时间线全局故事大纲视图与关键剧情摘要卡片流导出 |
+| `8d11c6d` | chore(task): archive 09-05-story-outline-summary |
+
+### Testing
+
+- [OK] 全量 64 项单元测试 100% 通过 (tests/story-outline.test.mjs)
+- [OK] 通过 Chrome CDP 在 Luker 实例端到端自动化验证大纲弹窗交互并截留验证图 luker_timelines_story_outline_verified.png
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 继续按 /goal 自主交付规划：推进全景数据指标统计看板、时光机快照管理与智能检索雷达
