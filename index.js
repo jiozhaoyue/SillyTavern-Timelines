@@ -104,6 +104,7 @@ import { applyLodToElements } from './src/lod-service.js';
 import { openExportModal } from './src/export-modal.js';
 import { openStoryOutlineModal } from './src/story-outline-modal.js';
 import { openAnalyticsModal } from './src/analytics-modal.js';
+import { openSnapshotGalleryModal } from './src/snapshot-modal.js';
 import { fetchData, prepareData } from './src/node-data.js';
 import { highlightElements, restoreElements, setupStylesAndData } from './src/style.js';
 import { closeModal, closeOpenDrawers, closeTippy, handleModalDisplay, navigateToMessage } from './src/utils.js';
@@ -1472,6 +1473,13 @@ function setupEventHandlers(cy, nodeData) {
     };
   }
 
+  let snapshotBtn = modal.getElementsByClassName('toggle-branch-snapshots')[0];
+  if (snapshotBtn) {
+    snapshotBtn.onclick = function () {
+      openSnapshotGalleryModal(cy, getTimelinesContext());
+    };
+  }
+
   // Next, attach some Cytoscape event listeners.
 
   cy.on('zoom', debounce(() => {
@@ -1792,6 +1800,9 @@ function renderCytoscapeDiagram(nodeData, customLayout = null) {
       },
       onAnalytics: () => {
         openAnalyticsModal(cy);
+      },
+      onSnapshots: () => {
+        openSnapshotGalleryModal(cy, getTimelinesContext());
       },
     });
 

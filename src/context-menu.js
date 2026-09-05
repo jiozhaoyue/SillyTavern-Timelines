@@ -34,7 +34,7 @@ function getNodeChatName(node) {
  * @param {Function} [callbacks.onReload] - 刷新图谱回调
  * @returns {Object|null}
  */
-export function initContextMenu(cy, { onReload, onExport, onOutline, onAnalytics } = {}) {
+export function initContextMenu(cy, { onReload, onExport, onOutline, onAnalytics, onSnapshots } = {}) {
   if (!cy || typeof cy.contextMenus !== 'function') {
     console.warn('Timelines: cy.contextMenus 扩展未就绪，跳过右键菜单初始化。');
     return null;
@@ -196,6 +196,17 @@ export function initContextMenu(cy, { onReload, onExport, onOutline, onAnalytics
       onClickFunction: () => {
         if (typeof onAnalytics === 'function') {
           onAnalytics();
+        }
+      },
+    },
+    {
+      id: 'tl-snapshots',
+      content: '⏳ 时光机存档画廊与检查点',
+      tooltipText: '纵览全分支剧情书签与检查点，极速定位与跨分支时空穿越',
+      selector: 'core',
+      onClickFunction: () => {
+        if (typeof onSnapshots === 'function') {
+          onSnapshots();
         }
       },
     },
