@@ -1,16 +1,26 @@
-# SillyTavern Timelines 扩展
+# SillyTavern Timelines 扩展 (Pro / Luker Refactor)
+
+> 💡 **项目完整 Wiki 文档与架构开发指南**：详见 [WIKI.md](./WIKI.md)。
 
 ![STTL_screenshot](https://github.com/Technologicat/SillyTavern-Timelines/assets/16972251/7fccb43f-b4f6-4e1d-8fdf-3bd68dfb1969)
 
-Timelines 是一个用于按时间线导航 SillyTavern/Luker 聊天历史的前端插件。它的思路类似 *Loom* [[1]](https://generative.ink/posts/loom-interface-to-the-multiverse/) [[2]](https://www.lesswrong.com/posts/bxt7uCiHam4QXrQAA/cyborgism#Appendix__Testimony_of_a_Cyborg)，但建立在 ST/Luker 的聊天范式之上。
+Timelines 是一个用于按多维时间树导航 SillyTavern/Luker 聊天历史的现代化前端插件。构建于原生聊天数据契约之上，致力于为大语言模型（LLM）角色扮演和分支叙事提供全景探索、差异对比、剧情大纲梳理与数据量化工作台。
 
-## 功能
+## 🌟 核心功能矩阵 (Feature Matrix)
 
-- 显示当前角色的所有聊天。同一深度中内容相同的消息会合并为一个时间线节点。
-- 对当前角色的全部消息内容做实时全文过滤。
-- 支持基于界面主题或自定义颜色的图样式。
-- 可从任意聊天消息或 swipe 创建新分支。
-- 支持检查点路径高亮、图例、节点悬浮预览、完整信息面板和快捷跳转。
+- ⚡ **全链路高性能拓扑引擎**：二级增量 JSONL 文件缓存 (`timelinesCache`)，Web Worker 异步 Dagre 布局，千节点毫秒级 O(1) 祖先回溯。
+- 🗺️ **全景小地图与鸟瞰穿梭**：顶部折叠式双缓冲 Canvas 小地图，带视口取景框几何投影与拖拽居中平移。
+- 🌿 **节点右键分支管理**：严格遵循原生契约，支持在任意节点一键创建新分支与安全删除分支。
+- ⚖️ **分支深度 Diff 对比**：智能计算最近公共祖先节点 (LCA)，双栏毛玻璃对比分流前后剧情演化轨迹。
+- 🍒 **单消息 Cherry-Pick 采摘与合并**：将任意分支的关键消息一键采摘至当前会话，或基于分叉点派生新分支进行剧情合并。
+- 🏷️ **原生彩色标签与书签系统**：非破坏性持久化于 `message.extra`，提供分类索引抽屉与视口聚焦脉冲。
+- 📖 **全局故事大纲视图**：主干因果链自动提取，智能分章聚合，提供剧情卡片流与 Markdown 研报导出。
+- 📊 **剧情分支量化分析看板**：统计总节点、结局分支、最大深度、角色发言天平比例柱状图、Swipes 探索率与高频标签排行。
+- ⏳ **分支检查点与时光机画廊**：全时间树书签与关键分流点纵向画廊，支持实时模糊搜索、一键视口定位与跨分支时空穿越。
+- 🔍 **智能全景雷达与多维检索**：支持正则表达式语法 (`/pattern/flags`)、角色切片、书签/标签筛选、楼层切片、结果步进器与全图半透明调光。
+- 📷 **超大画幅高保真导出**：支持 4K/8K 印刷级长图海报与完全无依赖的独立 SVG 矢量图导出，内置安全防爆缩放保护。
+- 📱 **移动端全景优化**：禁用框选冲突，优化捏合手势防抖，触屏长按呼出菜单，界面全面响应式自适应。
+- 🔌 **微内核解耦开放 API**：`window.TimelinesExtensionApi` 支持第三方插件通过节点装饰器注水（如记忆图谱 Memory Graph 零耦合适配）。
 
 ## 安装与使用
 
