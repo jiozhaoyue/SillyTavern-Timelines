@@ -337,3 +337,41 @@
 ### Next Steps
 
 - 继续按 /goal 自主交付规划：推进全景数据指标统计看板、时光机快照管理与智能检索雷达
+
+
+## Session 11: Session 11: 剧情分支深度量化统计与全景数据看板
+<!-- trellis-session: v=2 fp=0dbaedd6c289728b -->
+
+**Date**: 2026-09-05
+**Task**: Session 11: 剧情分支深度量化统计与全景数据看板
+**Branch**: `codex-luker-chinese-refactor`
+
+### Summary
+
+实现全景拓扑量化指标计算、对白发言天平与角色分布、Swipes 探索深度度量、高频剧情标签分布与一键导出 Markdown/JSON 数据看板
+
+### Main Changes
+
+- 新增 src/analytics-service.js 实现拓扑结构与发言量化计算函数
+- 新增 src/analytics-modal.js 实现玻璃拟态数据看板、KPI 卡片与导出动作
+- 在 timeline.html, settings.html, src/context-menu.js, style.css 增加全景数据入口与响应式样式
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c926fdb` | feat(analytics): 剧情分支深度量化统计与全景数据看板 |
+| `0316f61` | chore(task): archive 09-05-timeline-analytics |
+
+### Testing
+
+- [OK] 全量 69 项单元测试 100% 通过 (tests/analytics.test.mjs)
+- [OK] 通过 Chrome CDP 在 Luker 实例端到端自动化验证数据看板渲染并截留验证图 luker_timelines_analytics_verified.png
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 继续按 /goal 自主推进：时光机快照与分支存档管理 (branch-snapshots)
