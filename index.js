@@ -95,6 +95,7 @@ import { buildMemoryIndexForGraph } from './src/memory-graph-service.js';
 import { debounce, escapeHtml, escapeRegExp, makeContextKey } from './src/helpers.js';
 import { layoutService } from './src/layout-service.js';
 import { Minimap } from './src/minimap.js';
+import { applyLodToElements } from './src/lod-service.js';
 import { fetchData, prepareData } from './src/node-data.js';
 import { highlightElements, restoreElements, setupStylesAndData } from './src/style.js';
 import { closeModal, closeOpenDrawers, closeTippy, handleModalDisplay, navigateToMessage } from './src/utils.js';
@@ -129,6 +130,9 @@ let defaultSettings = {
   enableMaxZoom: true,
   maxZoom: 3.0,
   gpuAcceleration: true,
+  enableLodCollapsing: true,
+  lodMinChainLength: 10,
+  enableStyleLod: true,
 };
 
 let isLoadingSettings = false;
@@ -137,6 +141,8 @@ let lastContextKey = null; // 用来判断是否需要刷新图数据
 let lastTimelineData = null; // 最近一次取回并整理好的时间线数据
 let theCy = null; // Cytoscape 实例
 let minimapInstance = null; // 全景小地图实例
+let expandedClusterIds = new Set(); // 用户手动展开的 LOD 折叠段落
+let isLodCollapsedActive = true; // 抽稀折叠是否处于激活态
 
 let layout = {}; // Cytoscape 图布局配置；稍后由 `updateTimelineDataIfNeeded` 填充
 let hasRegisteredContextInvalidators = false;
@@ -204,6 +210,9 @@ async function loadSettings() {
     $('#tl_show_legend').prop('checked', settings.showLegend).trigger('input');
     $('#tl_use_chat_colors').prop('checked', settings.useChatColors).trigger('input');
     $('#tl_auto_expand_swipes').prop('checked', settings.autoExpandSwipes).trigger('input');
+    $('#tl_enable_lod_collapsing').prop('checked', settings.enableLodCollapsing).trigger('input');
+    $('#tl_lod_min_chain_length').val(settings.lodMinChainLength).trigger('input');
+    $('#tl_enable_style_lod').prop('checked', settings.enableStyleLod).trigger('input');
     $('#tl_zoom_current_chat').val(settings.zoomToCurrentChatZoom).trigger('input');
     $('#tl_zoom_min_cb').prop('checked', settings.enableMinZoom).trigger('input');
     $('#tl_zoom_min').val(settings.minZoom).trigger('input');
@@ -438,6 +447,14 @@ function makeNodeTippy(node) {
     }
     return out + '...';
   };
+
+  if (node.data('isCollapsedCluster')) {
+    const count = node.data('collapsedCount') || 0;
+    const content = `<b>📦 已折叠单链 (+${count} 轮)</b><br><span style="color:#94a3b8;font-size:0.85em">点击直接展开此段对话</span>`;
+    const tippy = makeTippy(node, content);
+    node._tippy = tippy;
+    return tippy;
+  }
 
   const truncatedMsg = formatNodeMessage(truncateMessage(node.data('msg')));
   const memPrefix = node.data('has_memory') ? '🧠 ' : '';
@@ -1406,7 +1423,45 @@ function setupEventHandlers(cy, nodeData) {
     };
   }
 
+  let toggleLodBtn = modal.getElementsByClassName('toggle-lod-collapse')[0];
+  if (toggleLodBtn) {
+    toggleLodBtn.classList.toggle('active', isLodCollapsedActive);
+    toggleLodBtn.onclick = async function () {
+      isLodCollapsedActive = !isLodCollapsedActive;
+      toggleLodBtn.classList.toggle('active', isLodCollapsedActive);
+      expandedClusterIds.clear();
+      await refreshDiagram(lastTimelineData, true);
+      if (isLodCollapsedActive) {
+        toastr.success('已开启智能长链抽稀折叠');
+      } else {
+        toastr.info('已全量展开所有折叠单链');
+      }
+    };
+  }
+
   // Next, attach some Cytoscape event listeners.
+
+  cy.on('zoom', debounce(() => {
+    if (!extension_settings.timeline.enableStyleLod) return;
+    const zoom = cy.zoom();
+    const isMacro = zoom < 0.35;
+    const edges = cy.edges();
+    if (isMacro) {
+      if (!cy.scratch('_lodMacro')) {
+        cy.scratch('_lodMacro', true);
+        cy.batch(() => {
+          edges.addClass('lod-macro-edge');
+        });
+      }
+    } else {
+      if (cy.scratch('_lodMacro')) {
+        cy.scratch('_lodMacro', false);
+        cy.batch(() => {
+          edges.removeClass('lod-macro-edge');
+        });
+      }
+    }
+  }, 100));
 
   cy.ready(function () {
     // Creating the legend requires scanning the graph for items to label, so do it now.
@@ -1507,9 +1562,16 @@ function setupEventHandlers(cy, nodeData) {
   });
 
   // Tap a node to open the full info panel
-  cy.on('tap', 'node', function (evt) {
+  cy.on('tap', 'node', async function (evt) {
     clearTimeout(showTimeout); // Clear any pending timeout for showing tooltip
     const node = evt.target;
+    if (node.data('isCollapsedCluster')) {
+      const clusterId = node.data('clusterId') || node.id();
+      expandedClusterIds.add(clusterId);
+      toastr.info(`已展开此折叠段落 (+${node.data('collapsedCount') || ''} 轮)`);
+      await refreshDiagram(lastTimelineData, false);
+      return;
+    }
     if (node._tippy) {
       // Hide tooltip if it is open
       node._tippy.hide();
@@ -1874,30 +1936,56 @@ async function onTimelineButtonClick(forceReload = false) {
     hideLoader();
   }
 
+/**
+ * 刷新当前时间线图（自适应 LOD 抽稀与异步/主线程布局）
+ *
+ * @param {Array} [nodeData=lastTimelineData] - 原始时间线数据
+ * @param {boolean} [fit=false] - 是否重置缩放以适应窗口
+ */
+async function refreshDiagram(nodeData = lastTimelineData, fit = false) {
+  if (!Array.isArray(nodeData) || nodeData.length === 0) {
+    return;
+  }
+
+  let effectiveElements = nodeData;
+  if (extension_settings.timeline.enableLodCollapsing && isLodCollapsedActive) {
+    const lodResult = applyLodToElements(nodeData, expandedClusterIds, {
+      enabled: true,
+      minChainLength: Number(extension_settings.timeline.lodMinChainLength) || 10,
+      minTotalNodes: 15,
+      force: false,
+    });
+    effectiveElements = lodResult.elements;
+  }
+
+  let activeLayout = layout;
+  if (Array.isArray(effectiveElements) && effectiveElements.length > 0) {
+    try {
+      const layoutRes = await layoutService.computeLayout(effectiveElements, {
+        ...layout,
+        nodeWidth: extension_settings.timeline.nodeWidth,
+        nodeHeight: extension_settings.timeline.nodeHeight,
+      });
+      if (layoutRes.success && layoutRes.positions) {
+        activeLayout = {
+          name: 'preset',
+          positions: node => layoutRes.positions[node.id()] || { x: 0, y: 0 },
+          fit: fit || !theCy,
+          padding: 50,
+        };
+      }
+    } catch (err) {
+      console.warn('Timelines: 异步布局计算异常，采用主线程布局：', err);
+    }
+  }
+
+  renderCytoscapeDiagram(effectiveElements, activeLayout);
+  toggleSwipes(theCy, extension_settings.timeline.autoExpandSwipes);
+}
+
   handleModalDisplay(); // Show the timeline view, and wire the close button to close it.
   if (dataUpdated || !theCy) {
-    let activeLayout = layout;
-    if (Array.isArray(lastTimelineData) && lastTimelineData.length > 0) {
-      try {
-        const layoutRes = await layoutService.computeLayout(lastTimelineData, {
-          ...layout,
-          nodeWidth: extension_settings.timeline.nodeWidth,
-          nodeHeight: extension_settings.timeline.nodeHeight,
-        });
-        if (layoutRes.success && layoutRes.positions) {
-          activeLayout = {
-            name: 'preset',
-            positions: node => layoutRes.positions[node.id()] || { x: 0, y: 0 },
-            fit: true,
-            padding: 50,
-          };
-        }
-      } catch (err) {
-        console.warn('Timelines: 异步布局计算异常，采用主线程布局：', err);
-      }
-    }
-    renderCytoscapeDiagram(lastTimelineData, activeLayout); // after this, the Cytoscape instance `theCy` is alive
-    toggleSwipes(theCy, extension_settings.timeline.autoExpandSwipes);
+    await refreshDiagram(lastTimelineData, true);
   }
   closeOpenDrawers();
 
@@ -1970,6 +2058,9 @@ jQuery(async () => {
     tl_zoom_min: 'minZoom',
     tl_zoom_max_cb: 'enableMaxZoom',
     tl_zoom_max: 'maxZoom',
+    tl_enable_lod_collapsing: 'enableLodCollapsing',
+    tl_lod_min_chain_length: 'lodMinChainLength',
+    tl_enable_style_lod: 'enableStyleLod',
     'bookmark-color-picker': 'bookmarkColor',
     'edge-color-picker': 'edgeColor',
     'user-node-color-picker': 'userNodeColor',
@@ -2011,6 +2102,9 @@ jQuery(async () => {
       if (!$('#cacheSettingsArea').hasClass('hidden')) {
         updateCacheStatusUI();
       }
+    });
+    $('#toggleLodSettings').click(function () {
+      $('#lodSettingsArea').toggleClass('hidden');
     });
   });
 

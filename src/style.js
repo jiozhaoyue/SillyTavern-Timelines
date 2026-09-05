@@ -250,6 +250,42 @@ export function setupStylesAndData(nodeData) {
                 'z-index': 10,
             },
         },
+        {
+            selector: 'node[?isCollapsedCluster]',
+            style: {
+                'shape': 'round-rectangle',
+                'width': '64px',
+                'height': '26px',
+                'background-color': '#1e293b',
+                'border-color': '#38bdf8',
+                'border-width': 2,
+                'border-style': 'dashed',
+                'border-opacity': 0.95,
+                'label': 'data(label)',
+                'font-size': '11px',
+                'font-weight': 'bold',
+                'color': '#38bdf8',
+                'text-valign': 'center',
+                'text-halign': 'center',
+                'z-index': 20,
+            },
+        },
+        {
+            selector: 'edge[?isCollapsedBridge]',
+            style: {
+                'line-style': 'dashed',
+                'line-color': '#38bdf8',
+                'width': 2,
+                'line-opacity': 0.75,
+            },
+        },
+        {
+            selector: 'edge.lod-macro-edge',
+            style: {
+                'curve-style': 'straight',
+                'width': 2,
+            },
+        },
     ];
 
     return cytoscapeStyles;

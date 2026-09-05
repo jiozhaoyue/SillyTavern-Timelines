@@ -262,6 +262,30 @@
   text-shadow: 0 0 12px rgba(192, 132, 252, 0.7);
 }
 
+/* 抽稀折叠/展开按钮 */
+.toggle-lod-collapse {
+  color: #aaaaaa;
+  float: right;
+  font-size: 24px;
+  font-weight: bold;
+  z-index: 3;
+  position: relative;
+  background: none;
+  border: none;
+  padding: 0;
+  padding-right: 10px;
+  transition: color 0.15s ease, text-shadow 0.15s ease;
+}
+.toggle-lod-collapse:hover {
+  color: #38bdf8;
+  text-decoration: none;
+  cursor: pointer;
+}
+.toggle-lod-collapse.active {
+  color: #38bdf8;
+  text-shadow: 0 0 12px rgba(56, 189, 248, 0.7);
+}
+
 /* 全景小地图顶部折叠条 */
 .timelines-minimap-drawer {
   position: absolute;
@@ -706,7 +730,8 @@
   .zoomtofit,
   .zoomtocurrent,
   .toggle-minimap,
-  .toggle-memory-milestones {
+  .toggle-memory-milestones,
+  .toggle-lod-collapse {
     font-size: 20px !important;
     padding: 6px !important;
     min-width: 38px !important;

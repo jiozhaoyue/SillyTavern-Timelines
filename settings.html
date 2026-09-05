@@ -315,6 +315,45 @@
         </div>
         <div class="timeline-view-settings_block flex-container">
           <input
+            value="LOD 性能优化"
+            class="menu_button"
+            type="button"
+            id="toggleLodSettings"
+            title="配置超大时间树的长单链智能折叠与远景连线简化。"
+            data-i18n="[title]配置超大时间树的长单链智能折叠与远景连线简化。"
+          />
+        </div>
+        <div id="lodSettingsArea" class="hidden">
+          <div class="timeline-view-settings_block flex-container">
+            <label
+              for="tl_enable_lod_collapsing"
+              title="当节点数量较多时，自动折叠连续无分叉的非关键单链（记忆点与书签始终保留）。"
+              data-i18n="[title]当节点数量较多时，自动折叠连续无分叉的非关键单链（记忆点与书签始终保留）。"
+              >启用智能长链抽稀折叠</label
+            >
+            <input id="tl_enable_lod_collapsing" type="checkbox" />
+          </div>
+          <div class="timeline-view-settings_block flex-container">
+            <label
+              for="tl_lod_min_chain_length"
+              title="触发折叠的最小连续单链长度（建议 8~20）。"
+              data-i18n="[title]触发折叠的最小连续单链长度（建议 8~20）。"
+              >折叠最小连续链长（<span id="tl_lod_min_chain_length_value"></span>）</label
+            >
+            <input id="tl_lod_min_chain_length" type="range" min="5" max="30" step="1" />
+          </div>
+          <div class="timeline-view-settings_block flex-container">
+            <label
+              for="tl_enable_style_lod"
+              title="在低缩放比（宏观远景）下，自动将折角连线降级为直线，大幅降低 GPU 与 CPU 开销。"
+              data-i18n="[title]在低缩放比（宏观远景）下，自动将折角连线降级为直线，大幅降低 GPU 与 CPU 开销。"
+              >远景连线智能极简化 (Style LOD)</label
+            >
+            <input id="tl_enable_style_lod" type="checkbox" />
+          </div>
+        </div>
+        <div class="timeline-view-settings_block flex-container">
+          <input
             id="show_timeline_view"
             class="menu_button"
             type="button"
@@ -338,6 +377,7 @@
               <button class="zoomtocurrent fa-solid fa-magnifying-glass-location" title="缩放到当前聊天"></button>
               <button class="toggle-minimap fa-solid fa-map" title="展开/收起全景小地图"></button>
               <button class="toggle-memory-milestones fa-solid fa-brain" title="过滤/高亮记忆关键节点 (Memory Milestones)"></button>
+              <button class="toggle-lod-collapse fa-solid fa-compress" title="切换智能长链抽稀折叠 (LOD)"></button>
               <input id="transparent-search" type="text" placeholder="搜索 [Ctrl+Shift+F]..." />
               <div class="graph-container">
                 <!-- 相对定位容器 -->

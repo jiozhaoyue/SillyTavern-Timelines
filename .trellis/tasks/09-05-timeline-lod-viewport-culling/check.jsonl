@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Ensure high quality, no regressions, and pure functional coverage for graph algorithms"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "Verify non-destructive handling of raw chat elements and Cytoscape models"}
