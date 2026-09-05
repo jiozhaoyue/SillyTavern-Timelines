@@ -151,3 +151,40 @@
 ### Next Steps
 
 - 根据用户规划推进下一阶段需求
+
+
+## Session 6: 超大时间树 LOD 分层抽稀与视口动态剔除性能优化
+<!-- trellis-session: v=2 fp=fca842cfa760702b -->
+
+**Date**: 2026-09-05
+**Task**: 超大时间树 LOD 分层抽稀与视口动态剔除性能优化
+**Branch**: `codex-luker-chinese-refactor`
+
+### Summary
+
+实现双轨驱动的 LOD 性能引擎：包含拓扑长单链自适应抽稀折叠、关键节点绝对保护、远景连线算法动态降级为直线、以及丰富的工具栏与交互展开支持。全量 43 项单元测试与实机 CDP 验证通过。
+
+### Main Changes
+
+- 新增 src/lod-service.js：纯算法实现连续单链拓扑分析、受保护节点（根/叶/分叉/记忆/书签/当前节点）过滤以及合成折叠节点与代理边生成
+- 修改 src/style.js 与 style.css：实现折叠胶囊节点视觉样式（round-rectangle 虚线框）、.lod-macro 极简连线样式与顶栏快捷按钮
+- 修改 index.js、timeline.html 与 settings.html：完成防抖 zoom 监听降级连线、单击胶囊局部平滑展开、顶栏快捷开关与设置项联动
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `256bb85` | feat(lod): 超大时间树 LOD 分层抽稀与视口动态剔除性能优化 |
+
+### Testing
+
+- [OK] 通过全量 43/43 项单元测试 (node --test tests/*.test.mjs)
+- [OK] 通过 Chrome CDP 在 live Luker 实例完成 Style LOD 切换、胶囊渲染、按钮切换与实机截图验证
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 根据用户规划推进下一阶段需求（如时间树节点自定义书签与标签系统、高清画幅导出等）
