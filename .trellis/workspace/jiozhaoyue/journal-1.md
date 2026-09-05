@@ -188,3 +188,38 @@
 ### Next Steps
 
 - 根据用户规划推进下一阶段需求（如时间树节点自定义书签与标签系统、高清画幅导出等）
+
+
+## Session 7: 通用扩展装饰器架构解耦与原生书签彩色标签系统
+<!-- trellis-session: v=2 fp=dda75260f22a1884 -->
+
+**Date**: 2026-09-05
+**Task**: 通用扩展装饰器架构解耦与原生书签彩色标签系统
+**Branch**: `codex-luker-chinese-refactor`
+
+### Summary
+
+将 Timelines 彻底解耦为微内核拓扑引擎，移出硬编码 memory-graph 依赖至独立适配器；严格基于酒馆原生契约实现节点彩色标签与书签系统及顶部索引抽屉。
+
+### Main Changes
+
+- 新增 src/api.js 扩展总线：registerNodeDecorator, registerToolbarAction, registerContextMenuAction
+- 新增 src/adapters/memory-graph-adapter.js：实现外部记忆图谱独立即插即用适配器
+- 新增 src/tag-manager.js：实现酒馆原生 message.extra.tags 持久化与 TagsDrawer 顶部卡片抽屉
+- 修改 index.js、timeline.html、settings.html 与 style.css：完成动态修饰器执行、顶栏开关与半透明毛玻璃样式
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f796361` | feat(tags): 通用扩展装饰器架构解耦与原生书签彩色标签系统 |
+| `b736781` | chore(task): archive 09-05-timeline-decoupling-bookmarks-tags |
+
+### Testing
+
+- [OK] 通过全量 49/49 项自动化单元测试 (node --test tests/*.test.mjs)
+- [OK] 通过 Chrome CDP 在 live Luker (8003) 完成书签标签保存、抽屉卡片渲染、平滑定位与截图验证
+
+### Status
+
+[OK] **Completed**
