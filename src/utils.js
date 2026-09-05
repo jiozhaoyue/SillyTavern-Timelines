@@ -4,6 +4,7 @@ import { createBranch } from '../../../../bookmarks.js';
 import { getTokenCount } from '../../../../tokenizers.js';
 import { getContext } from '../../../../extensions.js';
 import { debounce } from '../../../../utils.js';
+import { notifyBranchSwitched } from './api.js';
 import { cloneSwipeExtra } from './helpers.js';
 
 function getTimelinesContext() {
@@ -50,6 +51,7 @@ export async function navigateToMessage(chatSessionName, messageId, swipeId = -1
 
     // Switch to the requested chat session
     await openCharacterChat(chatSessionName);  // TODO: 群聊可能需要额外处理。
+    notifyBranchSwitched(chatSessionName);
     const chat = $('#chat');
     const sessionLength = chat.children('.mes').length;
 

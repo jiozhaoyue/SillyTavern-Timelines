@@ -201,6 +201,55 @@ export function setupStylesAndData(nodeData) {
                 'background-opacity': 0.5,
             },
         },
+        {
+            selector: 'node.has-memory',
+            style: {
+                'border-color': '#c084fc',
+                'border-width': 4,
+                'border-opacity': 1,
+            },
+        },
+        {
+            selector: 'node.memory-injected-recall',
+            style: {
+                'border-color': '#10b981',
+                'border-width': 5,
+                'border-opacity': 1,
+            },
+        },
+        {
+            selector: 'node.memory-injected-always',
+            style: {
+                'border-color': '#f59e0b',
+                'border-width': 5,
+                'border-opacity': 1,
+            },
+        },
+        {
+            selector: 'node.memory-dimmed, edge.memory-dimmed',
+            style: {
+                'opacity': 0.12,
+            },
+        },
+        {
+            selector: 'node.memory-highlight',
+            style: {
+                'opacity': 1,
+                'underlay-color': '#a855f7',
+                'underlay-padding': '4px',
+                'underlay-opacity': 0.6,
+                'underlay-shape': 'ellipse',
+            },
+        },
+        {
+            selector: 'edge.memory-highlight',
+            style: {
+                'opacity': 1,
+                'line-color': '#c084fc',
+                'width': 4,
+                'z-index': 10,
+            },
+        },
     ];
 
     return cytoscapeStyles;

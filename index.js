@@ -84,17 +84,22 @@ import { timelinesCache } from './src/cache.js';
 import { initContextMenu } from './src/context-menu.js';
 import {
   getGraphOrientation,
+  highlightMemoryMilestones,
   highlightNodesByQuery,
   makeQueryFragments,
   setGraphOrientationBasedOnViewport,
   toggleGraphOrientation,
 } from './src/graph.js';
+import { registerTimelinesExtensionApi, setTimelineGraphState } from './src/api.js';
+import { buildMemoryIndexForGraph } from './src/memory-graph-service.js';
 import { debounce, escapeHtml, escapeRegExp, makeContextKey } from './src/helpers.js';
 import { layoutService } from './src/layout-service.js';
 import { Minimap } from './src/minimap.js';
 import { fetchData, prepareData } from './src/node-data.js';
 import { highlightElements, restoreElements, setupStylesAndData } from './src/style.js';
 import { closeModal, closeOpenDrawers, closeTippy, handleModalDisplay, navigateToMessage } from './src/utils.js';
+
+registerTimelinesExtensionApi();
 
 let defaultSettings = {
   nodeWidth: 25,
@@ -435,7 +440,8 @@ function makeNodeTippy(node) {
   };
 
   const truncatedMsg = formatNodeMessage(truncateMessage(node.data('msg')));
-  let content = node.data('name') ? `<b>${escapeHtml(node.data('name'))}</b> ${truncatedMsg}` : truncatedMsg;
+  const memPrefix = node.data('has_memory') ? '🧠 ' : '';
+  let content = node.data('name') ? `<b>${memPrefix}${escapeHtml(node.data('name'))}</b> ${truncatedMsg}` : `${memPrefix}${truncatedMsg}`;
   content = highlightTextSearchMatches(content);
   const tippy = makeTippy(node, content);
   node._tippy = tippy; // Store the tippy instance on the graph element (so we can hide it later)
@@ -718,6 +724,39 @@ function makeTapTippy(ele) {
       }
       mesDiv.innerHTML = formattedMsg;
       div.appendChild(mesDiv);
+
+      // 关联记忆卡片展示 (Memory Graph)
+      const memoryBundle = ele.data('memoryBundle');
+      if (memoryBundle && memoryBundle.event) {
+        const memCard = document.createElement('div');
+        memCard.classList.add('node-memory-card');
+
+        const injectionStatus = ele.data('injectionStatus') || 'none';
+        let statusBadge = '<span class="memory-badge badge-none">未激活</span>';
+        if (injectionStatus === 'recall') {
+          statusBadge = '<span class="memory-badge badge-recall">本轮已召回注入</span>';
+        } else if (injectionStatus === 'always') {
+          statusBadge = '<span class="memory-badge badge-always">持久置顶注入</span>';
+        }
+
+        const evt = memoryBundle.event;
+        const locTitle = memoryBundle.location ? (memoryBundle.location.title || memoryBundle.location.id) : '';
+        const charsList = (memoryBundle.characters || []).map(c => c.title || c.id).join('、');
+
+        memCard.innerHTML = `
+          <div class="node-memory-header">
+            <span>🧠 关联长期记忆</span>
+            ${statusBadge}
+          </div>
+          <div class="node-memory-title">${escapeHtml(evt.title || '记忆事件')}</div>
+          <div class="node-memory-summary">${escapeHtml(evt.fields?.summary || evt.summary || '')}</div>
+          <div class="node-memory-meta">
+            ${locTitle ? `<span>📍 ${escapeHtml(locTitle)}</span>` : ''}
+            ${charsList ? `<span>👥 ${escapeHtml(charsList)}</span>` : ''}
+          </div>
+        `;
+        div.appendChild(memCard);
+      }
 
       return div;
     },
@@ -1038,6 +1077,7 @@ function initializeCytoscape(nodeData, styles, layoutConfig = layout) {
     autoungrabify: true, // 锁定节点绝对位置，防止触屏拖拽画布时误拖动单个节点
   });
   theCy = cy;
+  window.theCy = cy;
 
   return cy;
 }
@@ -1348,6 +1388,24 @@ function setupEventHandlers(cy, nodeData) {
     };
   }
 
+  let isMemoryFilterActive = false;
+  let toggleMemoryBtn = modal.getElementsByClassName('toggle-memory-milestones')[0];
+  if (toggleMemoryBtn) {
+    toggleMemoryBtn.classList.remove('active');
+    toggleMemoryBtn.onclick = function () {
+      isMemoryFilterActive = !isMemoryFilterActive;
+      toggleMemoryBtn.classList.toggle('active', isMemoryFilterActive);
+      const matched = highlightMemoryMilestones(cy, isMemoryFilterActive);
+      if (isMemoryFilterActive) {
+        if (matched > 0) {
+          toastr.info(`已高亮 ${matched} 个记忆关键节点及其因果链路。`);
+        } else {
+          toastr.info('当前图谱中暂无关联记忆的节点。您可在任意节点右键选择“为此节点补录记忆”。');
+        }
+      }
+    };
+  }
+
   // Next, attach some Cytoscape event listeners.
 
   cy.ready(function () {
@@ -1631,6 +1689,37 @@ function renderCytoscapeDiagram(nodeData, customLayout = null) {
 
     const networkContainer = document.getElementById('networkContainer');
     minimapInstance = new Minimap(cy, networkContainer);
+
+    // 1. 同步时间树拓扑状态供外部 API 导出读取
+    const currentContext = getTimelinesContext();
+    setTimelineGraphState(nodeData, currentContext?.chatId || currentContext?.chatMetadata?.file_name);
+
+    // 2. 主动异步查询 Luker memory-graph 记忆索引并渲染徽章与光环
+    (async () => {
+      try {
+        const memoryIndex = await buildMemoryIndexForGraph(currentContext, nodeData);
+        if (memoryIndex && memoryIndex.size > 0 && theCy) {
+          theCy.batch(() => {
+            for (const [nodeId, meta] of memoryIndex.entries()) {
+              const cyNode = theCy.getElementById(nodeId);
+              if (cyNode && cyNode.length > 0) {
+                cyNode.addClass('has-memory');
+                cyNode.data('has_memory', true);
+                cyNode.data('memoryBundle', meta.bundle);
+                cyNode.data('injectionStatus', meta.injectionStatus);
+                if (meta.injectionStatus === 'recall') {
+                  cyNode.addClass('memory-injected-recall');
+                } else if (meta.injectionStatus === 'always') {
+                  cyNode.addClass('memory-injected-always');
+                }
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('Timelines: 异步加载记忆节点索引失败:', err);
+      }
+    })();
   }
 }
 
@@ -1955,6 +2044,7 @@ jQuery(async () => {
   });
 
   loadSettings();
+  registerTimelinesExtensionApi();
 });
 
 /**

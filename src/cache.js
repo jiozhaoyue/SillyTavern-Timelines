@@ -202,6 +202,32 @@ class TimelinesCache {
     }
 
     /**
+     * 删除指定作用域下的单个聊天缓存
+     *
+     * @param {string} scopeKey - 角色或群组标识
+     * @param {string} fileName - 聊天文件名
+     */
+    async removeChat(scopeKey, fileName) {
+        const storageKey = this.makeStorageKey(scopeKey, fileName);
+        this._memoryFallback.delete(storageKey);
+
+        const db = await this.openDatabase();
+        if (!db) return;
+
+        return new Promise((resolve) => {
+            try {
+                const tx = db.transaction(STORE_CHATS, 'readwrite');
+                const store = tx.objectStore(STORE_CHATS);
+                store.delete(storageKey);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => resolve();
+            } catch (e) {
+                resolve();
+            }
+        });
+    }
+
+    /**
      * 删除指定作用域（如某角色）的所有缓存
      *
      * @param {string} scopeKey - 角色或群组标识

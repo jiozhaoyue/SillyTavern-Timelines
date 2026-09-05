@@ -190,3 +190,40 @@ export function getNodeDepth(node) {
     }
     return depth;
 }
+
+/**
+ * 切换记忆里程碑节点的过滤高亮状态
+ * 开启时：淡化无记忆事件的普通节点，高亮拥有记忆事件的关键转折节点及其溯源路径
+ * 关闭时：移除过滤高亮类名，恢复正常图谱呈现
+ *
+ * @param {Object} cy - Cytoscape 实例
+ * @param {boolean} enabled - 是否开启过滤
+ * @returns {number} 匹配到的记忆节点数量
+ */
+export function highlightMemoryMilestones(cy, enabled) {
+    if (!cy) return 0;
+
+    let matchedCount = 0;
+    cy.batch(() => {
+        if (!enabled) {
+            cy.elements().removeClass('memory-dimmed memory-highlight');
+            return;
+        }
+
+        const memoryNodes = cy.nodes('.has-memory');
+        matchedCount = memoryNodes.length;
+
+        if (matchedCount === 0) {
+            return;
+        }
+
+        // 获取记忆节点及追溯到 root 的所有入边和祖先节点
+        const highlightedElements = memoryNodes.union(memoryNodes.incomers());
+
+        cy.elements().addClass('memory-dimmed');
+        highlightedElements.removeClass('memory-dimmed').addClass('memory-highlight');
+    });
+
+    return matchedCount;
+}
+

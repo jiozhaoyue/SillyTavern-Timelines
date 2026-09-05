@@ -19,7 +19,7 @@ function ensureDagre() {
         return dagreLib;
     }
     try {
-        importScripts('../dagre.js');
+        importScripts('../vendor/dagre.js');
         if (typeof self !== 'undefined' && self.dagre) {
             dagreLib = self.dagre;
             return dagreLib;

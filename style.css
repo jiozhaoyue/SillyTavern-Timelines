@@ -238,6 +238,30 @@
   color: #58a6ff;
 }
 
+/* 记忆里程碑过滤高亮按钮 */
+.toggle-memory-milestones {
+  color: #aaaaaa;
+  float: right;
+  font-size: 24px;
+  font-weight: bold;
+  z-index: 3;
+  position: relative;
+  background: none;
+  border: none;
+  padding: 0;
+  padding-right: 10px;
+  transition: color 0.15s ease, text-shadow 0.15s ease;
+}
+.toggle-memory-milestones:hover {
+  color: #c084fc;
+  text-decoration: none;
+  cursor: pointer;
+}
+.toggle-memory-milestones.active {
+  color: #c084fc;
+  text-shadow: 0 0 12px rgba(192, 132, 252, 0.7);
+}
+
 /* 全景小地图顶部折叠条 */
 .timelines-minimap-drawer {
   position: absolute;
@@ -681,7 +705,8 @@
   .reload,
   .zoomtofit,
   .zoomtocurrent,
-  .toggle-minimap {
+  .toggle-minimap,
+  .toggle-memory-milestones {
     font-size: 20px !important;
     padding: 6px !important;
     min-width: 38px !important;
@@ -747,3 +772,113 @@
     border-bottom: none;
   }
 }
+
+/* 节点详情弹窗中的记忆信息卡 (memory-graph) */
+.node-memory-card {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: rgba(168, 85, 247, 0.12);
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  border-radius: 6px;
+  font-size: 0.9em;
+}
+.node-memory-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-weight: bold;
+  color: #d8b4fe;
+}
+.node-memory-title {
+  color: #f3e8ff;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.node-memory-summary {
+  color: #cbd5e1;
+  font-size: 0.88em;
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+.node-memory-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.82em;
+  color: #94a3b8;
+}
+.memory-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.78em;
+  font-weight: 600;
+}
+.memory-badge.badge-recall {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+.memory-badge.badge-always {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+.memory-badge.badge-none {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+/* 快速补录记忆弹窗 */
+.timelines-memory-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90vw;
+  max-width: 480px;
+  background: rgba(22, 27, 34, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), 0 0 20px rgba(168, 85, 247, 0.2);
+  border-radius: 10px;
+  padding: 20px;
+  z-index: 10005;
+  color: #e6edf3;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.timelines-memory-modal h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #d8b4fe;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.timelines-memory-modal input,
+.timelines-memory-modal textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(13, 17, 23, 0.85);
+  border: 1px solid #30363d;
+  color: #e6edf3;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+.timelines-memory-modal textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+.timelines-memory-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+
