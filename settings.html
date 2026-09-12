@@ -315,6 +315,74 @@
         </div>
         <div class="timeline-view-settings_block flex-container">
           <input
+            value="语义检索 (Authority)"
+            class="menu_button"
+            type="button"
+            id="toggleSemanticSettings"
+            title="接入 ST-Delegation-of-authority 服务端插件，构建持久化向量语义索引并解锁跨会话语义搜索。未安装 Authority 时功能自动休眠。"
+            data-i18n="[title]接入 ST-Delegation-of-authority 服务端插件，构建持久化向量语义索引并解锁跨会话语义搜索。未安装 Authority 时功能自动休眠。"
+          />
+        </div>
+        <div id="semanticSettingsArea" class="hidden">
+          <div class="timeline-view-settings_block flex-container">
+            <label
+              for="tl_semantic_enabled"
+              title="启用后，若检测到 Authority 服务端插件（window.STAuthority），将解锁语义索引与语义搜索；原生词法/正则检索不受影响。"
+              data-i18n="[title]启用后，若检测到 Authority 服务端插件（window.STAuthority），将解锁语义索引与语义搜索；原生词法/正则检索不受影响。"
+              >启用语义检索（需安装 Authority）</label
+            >
+            <input id="tl_semantic_enabled" type="checkbox" />
+          </div>
+          <div class="timeline-view-settings_block flex-container">
+            <label
+              for="tl_semantic_endpoint"
+              title="向量化端点；默认使用 SillyTavern 原生 embedding 接口。更换 embedding 后端会改变向量维度并自动切换索引库。"
+              data-i18n="[title]向量化端点；默认使用 SillyTavern 原生 embedding 接口。更换 embedding 后端会改变向量维度并自动切换索引库。"
+              >向量化端点</label
+            >
+            <input id="tl_semantic_endpoint" type="text" placeholder="/api/embeddings/compute" />
+          </div>
+          <div class="timeline-view-settings_block flex-container">
+            <label
+              for="tl_semantic_batch_size"
+              title="每批向量化/写入的文本数量；越大越快，但单次请求压力更大。建议 4~16。"
+              data-i18n="[title]每批向量化/写入的文本数量；越大越快，但单次请求压力更大。建议 4~16。"
+              >索引批次大小</label
+            >
+            <input id="tl_semantic_batch_size" type="number" min="1" max="64" step="1" />
+          </div>
+          <div
+            class="timeline-view-settings_block flex-container"
+            style="justify-content: space-between; align-items: center"
+          >
+            <span id="tl_semantic_status" style="font-size: 0.9em; opacity: 0.8">语义索引状态：未检测</span>
+          </div>
+          <div class="timeline-view-settings_block flex-container" style="gap: 8px">
+            <input
+              id="tl_semantic_build_btn"
+              class="menu_button"
+              type="button"
+              value="构建/更新索引"
+              title="增量构建当前角色全部分支会话的语义索引（内容未变的楼层自动跳过）。"
+            />
+            <input
+              id="tl_semantic_rebuild_btn"
+              class="menu_button"
+              type="button"
+              value="强制重建索引"
+              title="忽略增量指纹，全量重写当前角色的语义索引。"
+            />
+          </div>
+          <div
+            class="timeline-view-settings_block flex-container"
+            style="font-size: 0.85em; opacity: 0.75; margin-top: 4px"
+          >
+            首次调用会触发 Authority 授权弹窗（allow-once / allow-session / allow-always / deny），可在 Security Center
+            中统一管理授权与数据。
+          </div>
+        </div>
+        <div class="timeline-view-settings_block flex-container">
+          <input
             value="LOD 性能优化"
             class="menu_button"
             type="button"

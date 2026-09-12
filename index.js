@@ -73,7 +73,7 @@ const vendorReady = (async () => {
   console.error('Timelines: 第三方依赖加载失败。', error);
 });
 
-import { event_types, eventSource, saveSettingsDebounced } from '../../../../script.js';
+import { event_types, eventSource, getRequestHeaders, saveSettingsDebounced } from '../../../../script.js';
 import { extension_settings, getContext } from '../../../extensions.js';
 
 import { hideLoader, showLoader } from '../../../loader.js';
@@ -97,6 +97,9 @@ import {
 } from './src/api.js';
 import { initTagDecorator, TagsDrawer, openManageTagsModal } from './src/tag-manager.js';
 import { initMemoryGraphAdapter } from './src/adapters/memory-graph-adapter.js';
+import { initAuthorityAdapter, setAuthorityFeatureEnabled } from './src/adapters/authority-adapter.js';
+import { getSemanticIndexStatus, runSemanticIndexBuild } from './src/semantic-index-service.js';
+import { createEmbeddingProvider } from './src/embedding-provider.js';
 import { debounce, escapeHtml, escapeRegExp, makeContextKey } from './src/helpers.js';
 import { layoutService } from './src/layout-service.js';
 import { Minimap } from './src/minimap.js';
@@ -113,6 +116,7 @@ import { closeModal, closeOpenDrawers, closeTippy, handleModalDisplay, navigateT
 registerTimelinesExtensionApi();
 initTagDecorator();
 initMemoryGraphAdapter();
+initAuthorityAdapter();
 
 let defaultSettings = {
   nodeWidth: 25,
@@ -145,6 +149,9 @@ let defaultSettings = {
   enableLodCollapsing: true,
   lodMinChainLength: 10,
   enableStyleLod: true,
+  semanticSearchEnabled: false,
+  semanticEndpoint: '/api/embeddings/compute',
+  semanticBatchSize: 8,
 };
 
 let isLoadingSettings = false;
@@ -190,6 +197,38 @@ function getTimelineSettings() {
 }
 
 /**
+ * 计算语义索引/检索的作用域键（与本地缓存 scopeKey 同源：按角色或群组隔离）。
+ *
+ * @param {object} context - Luker/ST 上下文。
+ * @returns {string} 作用域键。
+ */
+function makeSemanticNamespace(context) {
+  if (!context?.characterId) {
+    return `group_${context?.groupId || 'unknown'}`;
+  }
+  return `char_${context.characterId ?? 'unknown'}`;
+}
+
+let semanticProviderInstance = null; // 语义检索 embedding 提供方单例（会话生命周期）
+
+/**
+ * 取得（并按需创建）语义检索 embedding 提供方；设置中的端点/批次仅在首次创建时生效。
+ *
+ * @returns {object} createEmbeddingProvider 实例。
+ */
+function getSemanticProvider() {
+  if (!semanticProviderInstance) {
+    const settings = getTimelineSettings();
+    semanticProviderInstance = createEmbeddingProvider({
+      endpoint: settings.semanticEndpoint || '/api/embeddings/compute',
+      batchSize: Number(settings.semanticBatchSize) || 8,
+      getHeaders: () => getRequestHeaders(),
+    });
+  }
+  return semanticProviderInstance;
+}
+
+/**
  * 从 Timelines 设置命名空间加载设置；缺失项用默认值补齐。
  *
  * 加载后同步更新设置面板控件。
@@ -227,6 +266,10 @@ async function loadSettings() {
     $('#tl_enable_lod_collapsing').prop('checked', settings.enableLodCollapsing).trigger('input');
     $('#tl_lod_min_chain_length').val(settings.lodMinChainLength).trigger('input');
     $('#tl_enable_style_lod').prop('checked', settings.enableStyleLod).trigger('input');
+    $('#tl_semantic_enabled').prop('checked', settings.semanticSearchEnabled).trigger('input');
+    $('#tl_semantic_endpoint').val(settings.semanticEndpoint).trigger('input');
+    $('#tl_semantic_batch_size').val(settings.semanticBatchSize).trigger('input');
+    setAuthorityFeatureEnabled(settings.semanticSearchEnabled);
     $('#tl_zoom_current_chat').val(settings.zoomToCurrentChatZoom).trigger('input');
     $('#tl_zoom_min_cb').prop('checked', settings.enableMinZoom).trigger('input');
     $('#tl_zoom_min').val(settings.minZoom).trigger('input');
@@ -1816,6 +1859,10 @@ function renderCytoscapeDiagram(nodeData, customLayout = null) {
     minimapInstance = new Minimap(cy, networkContainer);
     tagsDrawerInstance = new TagsDrawer(cy, networkContainer);
     searchRadarInstance = new SearchRadar(cy, document.getElementById('dialogue_deluxe') || document);
+    searchRadarInstance.configureSemantic({
+      provider: getSemanticProvider(),
+      namespace: makeSemanticNamespace(getTimelinesContext()),
+    });
 
     // 1. 同步时间树拓扑状态供外部 API 导出读取
     const currentContext = getTimelinesContext();
@@ -2125,6 +2172,9 @@ jQuery(async () => {
     tl_enable_lod_collapsing: 'enableLodCollapsing',
     tl_lod_min_chain_length: 'lodMinChainLength',
     tl_enable_style_lod: 'enableStyleLod',
+    tl_semantic_enabled: 'semanticSearchEnabled',
+    tl_semantic_endpoint: 'semanticEndpoint',
+    tl_semantic_batch_size: 'semanticBatchSize',
     'bookmark-color-picker': 'bookmarkColor',
     'edge-color-picker': 'edgeColor',
     'user-node-color-picker': 'userNodeColor',
@@ -2189,6 +2239,95 @@ jQuery(async () => {
     await updateCacheStatusUI();
     toastr.info('所有角色的时间线本地缓存已清空。');
   });
+
+  // ---- 语义检索 (Authority) 设置区 ----
+  $('#toggleSemanticSettings').click(function () {
+    $('#semanticSettingsArea').toggleClass('hidden');
+    if (!$('#semanticSettingsArea').hasClass('hidden')) {
+      updateSemanticStatusUI();
+    }
+  });
+
+  $('#tl_semantic_enabled').on('change', function () {
+    const enabled = $(this).prop('checked');
+    setAuthorityFeatureEnabled(enabled);
+    if (enabled) {
+      initAuthorityAdapter();
+    }
+    if (searchRadarInstance && typeof searchRadarInstance.refreshSemanticMode === 'function') {
+      searchRadarInstance.refreshSemanticMode();
+    }
+  });
+
+  $('#tl_semantic_endpoint').on('change', function () {
+    // 端点变更后重建 provider（维度/后端可能变化，雷达侧新查询自动生效）
+    semanticProviderInstance = null;
+  });
+
+  async function updateSemanticStatusUI() {
+    const $status = $('#tl_semantic_status');
+    if (!$status.length) return;
+    const namespace = makeSemanticNamespace(getTimelinesContext());
+    try {
+      const status = await getSemanticIndexStatus({ namespace });
+      if (!status.ok) {
+        $status.text(`语义索引状态：Authority ${status.error ?? '未就绪'}`);
+        return;
+      }
+      if (!status.database) {
+        $status.text(
+          status.indexedCount > 0
+            ? `语义索引状态：已有 ${status.indexedCount} 条记录（索引库待重建）`
+            : '语义索引状态：尚未构建索引',
+        );
+        return;
+      }
+      $status.text(
+        `语义索引状态：${status.nodeCount} 节点 / ${status.edgeCount} 边 · 库 ${status.database} · 上次构建 ${
+          status.lastIndexedAt ? new Date(status.lastIndexedAt).toLocaleString() : '未知'
+        }`,
+      );
+    } catch (err) {
+      $status.text(`语义索引状态：读取失败 (${err?.message ?? err})`);
+    }
+  }
+
+  async function triggerSemanticBuild(forceRebuild) {
+    const settings = getTimelineSettings();
+    if (!settings.semanticSearchEnabled) {
+      toastr.warning('请先启用语义检索（并确认已安装 Authority 服务端插件）。');
+      return;
+    }
+    const namespace = makeSemanticNamespace(getTimelinesContext());
+    const elements = window.TimelinesExtensionApi?.getTimelineTree?.() ?? [];
+    if (!elements.length) {
+      toastr.warning('当前时间树为空，没有可索引的节点。');
+      return;
+    }
+    toastr.info(forceRebuild ? '正在强制重建语义索引...' : '正在增量构建语义索引...');
+    try {
+      const result = await runSemanticIndexBuild({
+        elements,
+        namespace,
+        settings,
+        getHeaders: () => getRequestHeaders(),
+        forceRebuild,
+        onProgress: p => {
+          $('#tl_semantic_status').text(`语义索引状态：${p.message ?? p.phase} (${p.done}/${p.total})`);
+        },
+      });
+      toastr.success(
+        `语义索引${forceRebuild ? '重建' : '构建'}完成：写入 ${result.upserted}、跳过 ${result.unchanged}、清理 ${result.deleted}、链接 ${result.links}`,
+      );
+    } catch (err) {
+      console.error('[Timelines] 语义索引构建失败:', err);
+      toastr.error(`语义索引构建失败: ${err?.message ?? err}`);
+    }
+    updateSemanticStatusUI();
+  }
+
+  $('#tl_semantic_build_btn').on('click', () => triggerSemanticBuild(false));
+  $('#tl_semantic_rebuild_btn').on('click', () => triggerSemanticBuild(true));
 
   $('#resetSettingsBtn').click(function () {
     extension_settings[settingsNamespace] = Object.assign({}, defaultSettings);
