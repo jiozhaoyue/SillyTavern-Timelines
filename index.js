@@ -76,10 +76,8 @@ const vendorReady = (async () => {
 import { event_types, eventSource, getRequestHeaders, saveSettingsDebounced } from '../../../../script.js';
 import { extension_settings, getContext } from '../../../extensions.js';
 
-import { hideLoader, showLoader } from '../../../loader.js';
 import { fixMarkdown } from '../../../power-user.js';
 import { registerSlashCommand } from '../../../slash-commands.js';
-import { delay } from '../../../utils.js';
 import { timelinesCache } from './src/cache.js';
 import { initContextMenu } from './src/context-menu.js';
 import {
@@ -100,6 +98,14 @@ import { initMemoryGraphAdapter } from './src/adapters/memory-graph-adapter.js';
 import { initAuthorityAdapter, setAuthorityFeatureEnabled } from './src/adapters/authority-adapter.js';
 import { getSemanticIndexStatus, runSemanticIndexBuild } from './src/semantic-index-service.js';
 import { createEmbeddingProvider } from './src/embedding-provider.js';
+import { detectDeviceProfile } from './src/memory-profile.js';
+import { createProgressState, mountProgressOverlay } from './src/load-progress.js';
+import {
+  diffCytoscapeElements,
+  applyElementPatch,
+  assignProgressivePositions,
+} from './src/incremental-merge.js';
+import { convertToCytoscapeElements } from './src/graph-builder.js';
 import { debounce, escapeHtml, escapeRegExp, makeContextKey } from './src/helpers.js';
 import { layoutService } from './src/layout-service.js';
 import { Minimap } from './src/minimap.js';
@@ -109,7 +115,7 @@ import { openStoryOutlineModal } from './src/story-outline-modal.js';
 import { openAnalyticsModal } from './src/analytics-modal.js';
 import { openSnapshotGalleryModal } from './src/snapshot-modal.js';
 import { SearchRadar } from './src/search-radar.js';
-import { fetchData, prepareData } from './src/node-data.js';
+import { fetchData, prepareDataProgressive, getFullNodeText } from './src/node-data.js';
 import { highlightElements, restoreElements, setupStylesAndData } from './src/style.js';
 import { closeModal, closeOpenDrawers, closeTippy, handleModalDisplay, navigateToMessage } from './src/utils.js';
 
@@ -152,6 +158,7 @@ let defaultSettings = {
   semanticSearchEnabled: false,
   semanticEndpoint: '/api/embeddings/compute',
   semanticBatchSize: 8,
+  memorySaverMode: 'auto',
 };
 
 let isLoadingSettings = false;
@@ -162,6 +169,8 @@ let theCy = null; // Cytoscape 实例
 let minimapInstance = null; // 全景小地图实例
 let tagsDrawerInstance = null; // 书签与彩色标签抽屉实例
 let searchRadarInstance = null; // 智能全景雷达与多维检索器实例
+let activeMemoryProfile = null; // 当前会话的设备画像（省内存档位）
+let progressiveGeneration = 0;  // 渐进加载代际守卫（防止旧管线补丁写入新画布）
 let expandedClusterIds = new Set(); // 用户手动展开的 LOD 折叠段落
 let isLodCollapsedActive = true; // 抽稀折叠是否处于激活态
 
@@ -269,6 +278,7 @@ async function loadSettings() {
     $('#tl_semantic_enabled').prop('checked', settings.semanticSearchEnabled).trigger('input');
     $('#tl_semantic_endpoint').val(settings.semanticEndpoint).trigger('input');
     $('#tl_semantic_batch_size').val(settings.semanticBatchSize).trigger('input');
+    $('#tl_memory_saver_mode').val(settings.memorySaverMode).trigger('input');
     setAuthorityFeatureEnabled(settings.semanticSearchEnabled);
     $('#tl_zoom_current_chat').val(settings.zoomToCurrentChatZoom).trigger('input');
     $('#tl_zoom_min_cb').prop('checked', settings.enableMinZoom).trigger('input');
@@ -793,6 +803,10 @@ function makeTapTippy(ele) {
         mesDiv.classList.add('mes_text');
         formattedMsg = formatNodeMessage(ele.data('msg'));
         formattedMsg = highlightTextSearchMatches(formattedMsg);
+        // 细腰图模式：提示全文已截断（完整内容可在会话楼层查看）
+        if (ele.data('msgTruncated')) {
+          formattedMsg += `<div style="margin-top:6px;font-size:0.8em;opacity:0.65">ℹ️ 省内存模式下仅展示预览，完整内容请跳转对应会话楼层查看。</div>`;
+        }
       } else if (ele.data('id') === 'root') {
         // 根节点没有消息，只有 AI 角色名，因此不应使用 `mes_text` class。
         // 这样可让根节点的 Tippy 与 TapTippy 布局一致。
@@ -1897,21 +1911,67 @@ function renderCytoscapeDiagram(nodeData, customLayout = null) {
 }
 
 /**
+ * 依据扩展设置构建 Dagre 布局配置。
+ *
+ * @returns {Object} Cytoscape dagre 布局配置。
+ */
+function buildLayoutConfig() {
+  // https://github.com/cytoscape/cytoscape.js-dagre
+  // https://js.cytoscape.org/#layouts
+  return {
+    name: 'dagre',
+    nodeDimensionsIncludeLabels: true,
+    nodeSep: extension_settings.timeline.nodeSeparation, // 同一层级中相邻节点之间的间距。
+    edgeSep: extension_settings.timeline.edgeSeparation, // 布局中相邻边之间的间距。
+    rankSep: extension_settings.timeline.rankSeparation, // 布局中各层级之间的间距。
+    rankDir: 'LR', // 'TB' 为从上到下，'LR' 为从左到右；可由 `toggleGraphOrientation` 切换。
+    ranker: extension_settings.timeline.nodeRanker, // 节点层级算法：'network-simplex'、'tight-tree' 或 'longest-path'。
+    spacingFactor: extension_settings.timeline.spacingFactor, // 扩展或压缩节点整体占用区域的乘数（> 0）。
+    acyclicer: 'greedy', // 使用贪心方式兜底避免环。
+    align: extension_settings.timeline.align, // 层级节点对齐方式；可为 'UL'、'UR'、'DL' 或 'DR'。
+    sort: function (a, b) {
+      return a.id().localeCompare(b.id());
+    }, // 布局并列时使用稳定 ID 排序。
+  };
+}
+
+/**
+ * 求值当前会话的设备画像（省内存档位），会话内缓存。
+ *
+ * @returns {Object} detectDeviceProfile 输出。
+ */
+function ensureMemoryProfile() {
+  if (!activeMemoryProfile) {
+    const settings = getTimelineSettings();
+    activeMemoryProfile = detectDeviceProfile({ mode: settings.memorySaverMode || 'auto' });
+    console.info(`Timelines: 内存画像 → ${activeMemoryProfile.reason}`);
+  }
+  return activeMemoryProfile;
+}
+
+/**
  * Checks if the timeline data needs to be updated based on the context.
  * If the current context (representing either a character or a group chat session)
  * is different from the last known context, it fetches and prepares the required data.
  * The function then updates the layout configuration based on extension settings.
  *
+ * 传入 hooks 时走渐进管线：单文件粒度 onBatch（供增量渲染）+ onProgress（供进度条）。
+ *
  * @param {boolean} [forceReload=false] - 是否强制清空缓存并全量拉取数据。
+ * @param {Object} [hooks={}] - 可选渐进钩子 {onBatch(fileName, messages), onProgress(phase, payload)}。
  * @returns {Promise<boolean>} Returns true if the timeline data was updated, and false otherwise.
  */
-async function updateTimelineDataIfNeeded(forceReload = false) {
+async function updateTimelineDataIfNeeded(forceReload = false, hooks = {}) {
   const context = getTimelinesContext();
   const contextKey = makeContextKey(context);
   if (forceReload || lastContextKey !== contextKey) {
     let data = {};
+    const isGroupChat = !context.characterId;
+    const onBatch = typeof hooks.onBatch === 'function' ? hooks.onBatch : null;
+    const onProgress = typeof hooks.onProgress === 'function' ? hooks.onProgress : null;
+    const memoryProfile = ensureMemoryProfile();
 
-    if (!context.characterId) {
+    if (isGroupChat) {
       // group chat
       let groupID = context.groupId;
       if (groupID) {
@@ -1924,35 +1984,36 @@ async function updateTimelineDataIfNeeded(forceReload = false) {
         for (let i = 0; i < group.chats.length; i++) {
           data[i] = { file_name: group.chats[i] };
         }
-        lastTimelineData = await prepareData(data, true, forceReload);
+        lastTimelineData = await prepareDataProgressive(data, true, {
+          forceReload,
+          concurrency: memoryProfile.fetchConcurrency,
+          memoryProfile,
+          onBatch,
+          onProgress,
+        });
       } else {
         lastTimelineData = [];
       }
     } else {
+      if (onProgress) {
+        onProgress('list', { done: 0, total: 1, detail: context.characters?.[context.characterId]?.name ?? '' });
+      }
       data = await fetchData(context.characters[context.characterId].avatar);
-      lastTimelineData = await prepareData(data, false, forceReload);
+      if (onProgress) {
+        onProgress('list', { done: 1, total: 1, detail: `${Object.keys(data ?? {}).length} 个会话` });
+      }
+      lastTimelineData = await prepareDataProgressive(data, false, {
+        forceReload,
+        concurrency: memoryProfile.fetchConcurrency,
+        memoryProfile,
+        onBatch,
+        onProgress,
+      });
     }
 
     lastContextKey = contextKey;
     console.info('Timelines: 时间线数据已更新。');
-
-    // https://github.com/cytoscape/cytoscape.js-dagre
-    // https://js.cytoscape.org/#layouts
-    layout = {
-      name: 'dagre',
-      nodeDimensionsIncludeLabels: true,
-      nodeSep: extension_settings.timeline.nodeSeparation, // 同一层级中相邻节点之间的间距。
-      edgeSep: extension_settings.timeline.edgeSeparation, // 同一层级中相邻边之间的间距。
-      rankSep: extension_settings.timeline.rankSeparation, // 布局中各层级之间的间距。
-      rankDir: 'LR', // 'TB' 为从上到下，'LR' 为从左到右；可由 `toggleGraphOrientation` 切换。
-      ranker: extension_settings.timeline.nodeRanker, // 节点层级算法：'network-simplex'、'tight-tree' 或 'longest-path'。
-      spacingFactor: extension_settings.timeline.spacingFactor, // 扩展或压缩节点整体占用区域的乘数（> 0）。
-      acyclicer: 'greedy', // 使用贪心方式兜底避免环。
-      align: extension_settings.timeline.align, // 层级节点对齐方式；可为 'UL'、'UR'、'DL' 或 'DR'。
-      sort: function (a, b) {
-        return a.id().localeCompare(b.id());
-      }, // 布局并列时使用稳定 ID 排序。
-    };
+    layout = buildLayoutConfig();
     return true; // 数据已更新。
   }
   return false; // No update occurred
@@ -1986,7 +2047,15 @@ function zoomToCurrentChatNode(cy) {
 
   // 在图上查找包含该消息文本的节点。
   const selector = function (ele) {
-    return ele.data('msg') === mes;
+    const msg = ele.data('msg');
+    if (!msg) return false;
+    if (msg === mes) return true;
+    // 细腰图模式：节点 msg 为截断预览，按去省略号前缀匹配
+    if (ele.data('msgTruncated') && typeof msg === 'string') {
+      const base = msg.endsWith('...') ? msg.slice(0, -3) : msg;
+      return mes.startsWith(base);
+    }
+    return false;
   };
   const newCenterNode = cy.filter(selector);
   if (newCenterNode.length === 0) {
@@ -2027,25 +2096,130 @@ function flashNode(node, howManyFlashes, duration) {
 
 /**
  * Handler function that is called when the timeline button is clicked.
- * This function checks if the timeline data needs to be updated, handles modal display,
- * potentially renders the Cytoscape diagram, and sets the focus on a specific HTML element.
  *
+ * 渐进式打开流程（画布先行）：
+ * 1. 立即打开画布视图并初始化空骨架 + 常驻进度条（不出现全屏加载遮罩）。
+ * 2. 数据管线后台运行，单文件粒度节流重建 + id 级 diff 补丁，节点就绪即渲染。
+ * 3. 全部就绪后走既有 refreshDiagram 全量路径（LOD + dagre 布局 + fit）并定位当前会话。
+ *
+ * @param {boolean} [forceReload=false] - 是否强制清空缓存并全量重载。
  * @returns {Promise<void>}
  */
 async function onTimelineButtonClick(forceReload = false) {
-  let dataUpdated = false;
-  try {
-    showLoader();
-    await vendorReady;
-    if (vendorLoadError) {
-      toastr.error('Timelines: 第三方依赖加载失败，无法打开时间线。');
-      return;
-    }
-    dataUpdated = await updateTimelineDataIfNeeded(forceReload);
-  } finally {
-    await delay(1); // This avoids the loading screen getting stuck when there is no need to update the data.
-    hideLoader();
+  await vendorReady;
+  if (vendorLoadError) {
+    toastr.error('Timelines: 第三方依赖加载失败，无法打开时间线。');
+    return;
   }
+
+  const context = getTimelinesContext();
+  const contextKey = makeContextKey(context);
+  const needsUpdate = forceReload || lastContextKey !== contextKey;
+
+  // 画布先行：立即展示视图；数据未就绪时呈现空骨架
+  handleModalDisplay();
+  closeOpenDrawers();
+
+  // 秒开路径：上下文未变且画布仍在，直接定位当前会话
+  if (!needsUpdate && theCy) {
+    setTimeout(() => {
+      const textSearchElement = document.getElementById('transparent-search');
+      if (textSearchElement) {
+        textSearchElement.focus();
+        textSearchElement.select();
+      }
+      if (theCy) {
+        zoomToCurrentChatNode(theCy);
+      }
+    }, 500);
+    return;
+  }
+
+  // 渐进管线：空骨架 → 后台加载 → 增量补丁 → 最终布局
+  const myGeneration = ++progressiveGeneration;
+  layout = buildLayoutConfig();
+  renderCytoscapeDiagram([], layout);
+
+  const progressState = createProgressState();
+  const tracker = mountProgressOverlay(document.getElementById('networkContainer') ?? document.body);
+  const unsubscribe = tracker ? progressState.subscribe(s => tracker.update(s)) : () => {};
+
+  const progressiveDict = {}; // 累积的 {fileName: messages} 字典（构建期临时引用，收尾后可释放）
+  let renderedElements = [];  // 当前已渲染元素（diff 基准）
+  let rebuildTimer = null;
+
+  /**
+   * 节流增量重建：累积批次 → 全量 rebuild → id diff → 补丁上屏。
+   * buildGraph 输入前缀确定性保证已有节点 id 稳定，diff 面积极小。
+   */
+  const scheduleRebuild = () => {
+    clearTimeout(rebuildTimer);
+    rebuildTimer = setTimeout(async () => {
+      if (myGeneration !== progressiveGeneration || !theCy) return;
+      try {
+        progressState.set('build', { detail: '增量重建拓扑' });
+        const nextElements = convertToCytoscapeElements(progressiveDict, activeMemoryProfile);
+        const diff = diffCytoscapeElements(renderedElements, nextElements);
+        applyElementPatch(theCy, diff);
+
+        // 新增节点兜底定位（父位置 + 网格偏移），worker 布局未就绪时防止堆叠在原点
+        if (diff.added.length > 0) {
+          const positions = assignProgressivePositions(diff.added, id => {
+            const ele = theCy.getElementById(id);
+            return ele.nonempty() ? ele.position() : null;
+          });
+          theCy.batch(() => {
+            for (const [id, pos] of positions) {
+              const ele = theCy.getElementById(id);
+              if (ele.nonempty()) {
+                ele.position(pos);
+              }
+            }
+          });
+        }
+
+        renderedElements = nextElements;
+        lastTimelineData = nextElements;
+      } catch (err) {
+        console.warn('Timelines: 渐进重建失败（将在收尾时全量重渲染）:', err);
+      }
+    }, 600);
+  };
+
+  try {
+    lastTimelineData = [];
+    await updateTimelineDataIfNeeded(forceReload, {
+      onBatch: (fileName, messages) => {
+        progressiveDict[fileName] = messages;
+        scheduleRebuild();
+      },
+      onProgress: (phase, payload) => progressState.set(phase, payload),
+    });
+
+    if (myGeneration !== progressiveGeneration) return; // 期间已被新的加载取代
+
+    // 收尾：取消挂起的节流重建；updateTimelineDataIfNeeded 内已产出完整构建结果
+    clearTimeout(rebuildTimer);
+    renderedElements = lastTimelineData;
+
+    progressState.set('layout', { done: 0, total: 1, detail: 'LOD 抽稀与 Dagre 布局' });
+    if (Array.isArray(lastTimelineData) && lastTimelineData.length > 0) {
+      await refreshDiagram(lastTimelineData, true);
+    }
+    progressState.done();
+  } catch (err) {
+    console.error('Timelines: 渐进加载失败，回退一次性渲染:', err);
+    progressState.fail(err);
+    if (myGeneration === progressiveGeneration && Array.isArray(lastTimelineData) && lastTimelineData.length > 0) {
+      await refreshDiagram(lastTimelineData, true);
+    }
+    toastr.error(`时间线加载失败: ${err?.message ?? err}`);
+  } finally {
+    unsubscribe();
+  }
+
+
+}
 
 /**
  * 刷新当前时间线图（自适应 LOD 抽稀与异步/主线程布局）
@@ -2092,27 +2266,6 @@ async function refreshDiagram(nodeData = lastTimelineData, fit = false) {
 
   renderCytoscapeDiagram(effectiveElements, activeLayout);
   toggleSwipes(theCy, extension_settings.timeline.autoExpandSwipes);
-}
-
-  handleModalDisplay(); // Show the timeline view, and wire the close button to close it.
-  if (dataUpdated || !theCy) {
-    await refreshDiagram(lastTimelineData, true);
-  }
-  closeOpenDrawers();
-
-  // Let the window layout settle itself for 500 ms before trying to zoom
-  // (this avoids some failed pans/zooms).
-  setTimeout(() => {
-    let textSearchElement = document.getElementById('transparent-search');
-    if (textSearchElement) {
-      textSearchElement.focus();
-      textSearchElement.select(); // select content for easy erasing
-    }
-    if (theCy) {
-      zoomToCurrentChatNode(theCy); // override the zoom-to-search
-    }
-    // textSearchElement.dispatchEvent(new Event('input'));  // no need to trigger input event to perform search, since now focusing the element already searches
-  }, 500);
 }
 
 /**
@@ -2175,6 +2328,7 @@ jQuery(async () => {
     tl_semantic_enabled: 'semanticSearchEnabled',
     tl_semantic_endpoint: 'semanticEndpoint',
     tl_semantic_batch_size: 'semanticBatchSize',
+    tl_memory_saver_mode: 'memorySaverMode',
     'bookmark-color-picker': 'bookmarkColor',
     'edge-color-picker': 'edgeColor',
     'user-node-color-picker': 'userNodeColor',
@@ -2262,6 +2416,11 @@ jQuery(async () => {
   $('#tl_semantic_endpoint').on('change', function () {
     // 端点变更后重建 provider（维度/后端可能变化，雷达侧新查询自动生效）
     semanticProviderInstance = null;
+  });
+
+  $('#tl_memory_saver_mode').on('change', function () {
+    // 档位变更后失效画像缓存，下次加载时间线时重新求值
+    activeMemoryProfile = null;
   });
 
   async function updateSemanticStatusUI() {

@@ -3035,3 +3035,130 @@
   color: #94a3b8;
   padding: 24px 0;
 }
+
+/* ===================== 渐进加载进度条（全程常驻胶囊） ===================== */
+
+.timelines-load-progress {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  width: min(420px, calc(100% - 24px));
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 8px 14px 9px;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  pointer-events: none;
+}
+
+.timelines-load-progress.is-hidden {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-12px);
+}
+
+.timelines-load-progress.is-failed {
+  border-color: rgba(248, 113, 113, 0.6);
+  background: rgba(60, 15, 15, 0.94);
+}
+
+.timelines-load-progress .tlp-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.timelines-load-progress .tlp-spinner {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(56, 189, 248, 0.35);
+  border-top-color: #38bdf8;
+  border-radius: 50%;
+  animation: tlp-spin 0.8s linear infinite;
+}
+
+.timelines-load-progress.is-failed .tlp-spinner {
+  border-color: rgba(248, 113, 113, 0.4);
+  border-top-color: #f87171;
+  animation-duration: 1.6s;
+}
+
+.timelines-load-progress.is-done .tlp-spinner {
+  border-color: rgba(74, 222, 128, 0.5);
+  border-top-color: #4ade80;
+  animation: none;
+}
+
+@keyframes tlp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.timelines-load-progress .tlp-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  color: #e2e8f0;
+}
+
+.timelines-load-progress.is-failed .tlp-label {
+  color: #fca5a5;
+}
+
+.timelines-load-progress .tlp-percent {
+  flex: none;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #38bdf8;
+  font-variant-numeric: tabular-nums;
+}
+
+.timelines-load-progress.is-failed .tlp-percent {
+  color: #f87171;
+}
+
+.timelines-load-progress .tlp-bar {
+  margin-top: 5px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.timelines-load-progress .tlp-bar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #38bdf8, #818cf8);
+  transition: width 0.35s ease;
+}
+
+.timelines-load-progress.is-failed .tlp-bar-fill {
+  background: #f87171;
+}
+
+.timelines-load-progress.is-done .tlp-bar-fill {
+  background: linear-gradient(90deg, #4ade80, #38bdf8);
+}
+
+/* 移动端：更紧凑的胶囊 */
+@media (max-width: 768px) {
+  .timelines-load-progress {
+    top: 8px;
+    padding: 6px 10px 8px;
+  }
+
+  .timelines-load-progress .tlp-label {
+    font-size: 0.78rem;
+  }
+}
