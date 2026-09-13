@@ -475,3 +475,26 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 15: 极端内存优化与渐进式渲染：画布先行+后台加载+全程进度
+<!-- trellis-session: v=2 fp=fe5ef4db1bd71b7c -->
+
+**Date**: 2026-09-13
+**Task**: 极端内存优化与渐进式渲染：画布先行+后台加载+全程进度
+**Branch**: `codex-luker-chinese-refactor`
+
+### Summary
+
+画布先行（无全屏 loader，空骨架即开）、prepareDataProgressive 单文件粒度后台管线（活跃会话先行/缓存分块回放/网络逐文件回调）、600ms 节流 rebuild + id 级 diff 增量补丁上屏、常驻进度胶囊（阶段权重百分比+实时文件名，完成淡出/失败红态）；细腰图：设备画像自动判定（weak→160 字预览+并发 4）、swipe 文本截断、getFullNodeText 按需全文、msgTruncated 卡片提示与 zoom 前缀匹配；默认档位 graph-builder 输出逐字节不变，110/110 测试全绿
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3b1220c` | feat(perf): 渐进式渲染管线——画布先行、增量补丁与全程进度条 |
+| `9fe18c6` | feat(perf): 细腰图内存极压——设备画像、文本预览与渐进数据管线 |
+
+### Status
+
+[OK] **Completed**
