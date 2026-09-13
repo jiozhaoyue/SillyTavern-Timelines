@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/luker-plugin-standards.md", "reason": "Luker 前端插件规范"}
+{"file": ".trellis/spec/frontend/optional-integration.md", "reason": "Node 可测模块约定（纯逻辑/IO 分离、宿主模块禁止静态导入）"}
