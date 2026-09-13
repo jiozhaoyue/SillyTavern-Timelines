@@ -1,0 +1,4 @@
+{"file": ".trellis/tasks/09-12-authority-integration/research/authority-sdk-api-summary.md", "reason": "核对实现是否符合 Authority SDK 契约与反模式清单"}
+{"file": ".trellis/tasks/09-12-authority-integration/research/authority-trivium-types.ts", "reason": "核对 Trivium 调用字段名与 DTO 一致性"}
+{"file": ".trellis/spec/frontend/luker-plugin-standards.md", "reason": "核对 Luker 插件规范合规"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "前端规范入口"}
