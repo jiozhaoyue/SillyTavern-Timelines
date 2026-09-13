@@ -451,3 +451,27 @@
 ### Next Steps
 
 - 完成项目终极全景功能文档 Wiki (WIKI.md 与 docs/) 并做最终交付
+
+
+## Session 14: Authority 服务端集成：语义索引与跨会话搜索
+<!-- trellis-session: v=2 fp=e908adb6553aabdc -->
+
+**Date**: 2026-09-13
+**Task**: Authority 服务端集成：语义索引与跨会话搜索
+**Branch**: `codex-luker-chinese-refactor`
+
+### Summary
+
+通过可选接入 ST-Delegation-of-authority：authority-adapter 状态机与最小权限嗅探、Trivium 增量语义索引（externalId=chatFile::messageId，content_hash diff）、searchHybrid 语义搜索接入雷达（当前图重排 + 跨会话弹窗穿越）、embedding provider 熔断降级；默认零依赖零行为变化；沉淀 optional-integration spec（Node 可测模块约定 + 可选插件接入范式）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a98d46f` | feat(semantic): Authority 服务端集成——语义索引/检索纯逻辑模块与适配器 |
+| `5f91736` | feat(semantic): 雷达语义模式、跨会话结果弹窗与设置面板接线 |
+| `eeef418` | docs(spec): 沉淀可选外部插件接入与 Node 可测模块规范 |
+
+### Status
+
+[OK] **Completed**

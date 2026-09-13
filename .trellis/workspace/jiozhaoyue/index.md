@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 13
-- **Last Active**: 2026-09-05
+- **Total Sessions**: 14
+- **Last Active**: 2026-09-13
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~453 | Active |
+| `journal-1.md` | ~477 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 14 | 2026-09-13 | Authority 服务端集成：语义索引与跨会话搜索 | `a98d46f`, `5f91736`, `eeef418` | `codex-luker-chinese-refactor` |
 | 13 | 2026-09-05 | Session 13: 智能全景雷达与多维复合检索器 | `2a7c69b`, `22614f3` | `codex-luker-chinese-refactor` |
 | 12 | 2026-09-05 | Session 12: 分支检查点快照与时光机存档画廊管理 | `cc4db83`, `294b9f8` | `codex-luker-chinese-refactor` |
 | 11 | 2026-09-05 | Session 11: 剧情分支深度量化统计与全景数据看板 | `c926fdb`, `0316f61` | `codex-luker-chinese-refactor` |
