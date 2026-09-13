@@ -1,4 +1,5 @@
 import { normalizeMessageText } from './helpers.js';
+import { truncateForNode } from './memory-profile.js';
 
 /**
  * Preprocesses chat sessions to aggregate messages from different files into a unified structure.
@@ -62,7 +63,7 @@ export function groupMessagesByContent(messages) {
  * @param {Object} allChatFileNamesAndLengths - A dictionary `{file_name: length_in_messages}`.
  * @returns {Array} cyElements - A list of deduplicated node and edge objects suitable for Cytoscape.
  */
-export function buildGraph(allChats, allChatFileNamesAndLengths = {}) {
+export function buildGraph(allChats, allChatFileNamesAndLengths = {}, memoryProfile = null) {
   let cyElements = [];
   let keyCounter = 1;
   let previousNodes = {};
@@ -110,7 +111,7 @@ export function buildGraph(allChats, allChatFileNamesAndLengths = {}) {
     for (const [text, group] of Object.entries(groups)) {
       const nodeId = `message${keyCounter}`;
       keyCounter += 1;
-      const node = createNode(nodeId, messageId, text, group, allChatFileNamesAndLengths);
+      const node = createNode(nodeId, messageId, text, group, allChatFileNamesAndLengths, memoryProfile);
 
       // 1. 推入唯一节点（修复原本在 group 遍历中重复推入的缺陷）
       cyElements.push({
@@ -150,10 +151,15 @@ export function buildGraph(allChats, allChatFileNamesAndLengths = {}) {
           uniqueSwipes.forEach(swipeText => {
             const swipeNodeId = `swipe${keyCounter}-${parentSwipeData[parentNodeId].totalSwipes}`;
             const swipeIndex = allSwipes.indexOf(swipeText);
+            const swipePreview =
+              memoryProfile?.maxPreviewChars > 0
+                ? truncateForNode(swipeText, memoryProfile.maxPreviewChars)
+                : null;
             const swipeNode = {
               ...node,
               id: swipeNodeId,
-              msg: swipeText,
+              msg: swipePreview ? swipePreview.text : swipeText,
+              ...(swipePreview ? { msgTruncated: swipePreview.truncated } : {}),
               isSwipe: true,
               swipeId: swipeIndex,
             };
@@ -206,7 +212,7 @@ export function buildGraph(allChats, allChatFileNamesAndLengths = {}) {
 /**
  * Constructs a Cytoscape node object based on provided message details.
  */
-export function createNode(nodeId, messageId, text, group, allChatFileNamesAndLengths = {}) {
+export function createNode(nodeId, messageId, text, group, allChatFileNamesAndLengths = {}, memoryProfile = null) {
   let bookmark = group.find(({ message }) => {
     if (!message) return false;
     if (
@@ -271,9 +277,12 @@ export function createNode(nodeId, messageId, text, group, allChatFileNamesAndLe
     }
   }
 
+  const preview = memoryProfile?.maxPreviewChars > 0 ? truncateForNode(text, memoryProfile.maxPreviewChars) : null;
+
   return {
     id: nodeId,
-    msg: text,
+    msg: preview ? preview.text : text,
+    ...(preview ? { msgTruncated: preview.truncated } : {}),
     chat_depth: messageId,
     isBookmark: isBookmark,
     bookmarkName: bookmarkName,
@@ -375,11 +384,11 @@ export function highlightPathToRoot(
  * @param {Object} chatHistory - { [fileName]: messagesArray }
  * @returns {Array} Cytoscape 节点与边元素数组
  */
-export function convertToCytoscapeElements(chatHistory) {
+export function convertToCytoscapeElements(chatHistory, memoryProfile = null) {
   const allChats = preprocessChatSessions(chatHistory);
   const allChatFileNamesAndLengths = {};
   for (const [key, val] of Object.entries(chatHistory || {})) {
     allChatFileNamesAndLengths[key] = Array.isArray(val) ? val.length : 0;
   }
-  return buildGraph(allChats, allChatFileNamesAndLengths);
+  return buildGraph(allChats, allChatFileNamesAndLengths, memoryProfile);
 }

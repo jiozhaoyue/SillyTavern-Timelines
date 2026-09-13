@@ -314,6 +314,19 @@
           </div>
         </div>
         <div class="timeline-view-settings_block flex-container">
+          <label
+            for="tl_memory_saver_mode"
+            title="auto：按设备能力自动判定（手机/低内存设备自动开启细腰图，节点仅驻留文本预览）；on：强制开启；off：强制关闭（驻留全量文本）。"
+            data-i18n="[title]auto：按设备能力自动判定（手机/低内存设备自动开启细腰图，节点仅驻留文本预览）；on：强制开启；off：强制关闭（驻留全量文本）。"
+            >省内存模式（细腰图）</label
+          >
+          <select id="tl_memory_saver_mode">
+            <option value="auto">自动（推荐）</option>
+            <option value="on">始终开启</option>
+            <option value="off">始终关闭</option>
+          </select>
+        </div>
+        <div class="timeline-view-settings_block flex-container">
           <input
             value="语义检索 (Authority)"
             class="menu_button"
