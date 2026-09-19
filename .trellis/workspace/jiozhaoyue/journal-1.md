@@ -547,3 +547,49 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 17: 复制消息全文——右键菜单与详情面板剪贴板支持
+<!-- trellis-session: v=2 fp=5991fa6cab408c04 -->
+
+**Date**: 2026-09-19
+**Task**: 复制消息全文——右键菜单与详情面板剪贴板支持
+**Branch**: `codex-luker-chinese-refactor`
+
+### Summary
+
+右键菜单「复制消息全文」+ 详情面板「复制全文」按钮 + Clipboard 工具函数（含回退），补齐更多上下文菜单选项 TODO
+
+### Main Changes
+
+### Summary
+
+右键菜单与节点详情面板支持复制消息全文：新增 Clipboard 工具（含非安全上下文回退）、菜单项与面板按钮，补齐 index.js 遗留 TODO「更多上下文菜单选项」
+
+### Main Changes
+
+- 审计 src/load-progress.js、src/incremental-merge.js 与雷达语义模式接线，确认无阻断缺陷
+- src/utils.js 新增 copyTextToClipboard：Clipboard API 优先，非安全上下文（http 部署/旧 WebView）回退 textarea + execCommand
+- src/context-menu.js 新增「📋 复制消息全文」菜单项：经 getFullNodeText 解析楼层原文（swipe 节点复制对应变体，细腰图截断节点还原全文）
+- index.js 节点详情面板「展开全文」旁新增「📋 复制全文」按钮（已复制/失败反馈 + 1.5s 复位）
+- WIKI 4.3/3.6 与 README 交互说明同步更新
+
+### Testing
+
+- [OK] 全量 118 项单元测试 100% 通过
+- [OK] node --check 校验 index.js / src/utils.js / src/context-menu.js 通过
+
+### Next Steps
+
+- 剩余 TODO 候选：iOS 移动端点击验证、边标签 (edge labels)、实验性多树视图
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d6714e4` | feat(ux): 右键菜单与详情面板支持复制消息全文——补齐上下文菜单选项 TODO |
+
+### Status
+
+[OK] **Completed**
