@@ -51,13 +51,58 @@ export function decodeExternalId(externalId) {
 }
 
 /**
- * 规范化节点文本（图谱节点以 message 为主，兼容 text 字段）。
+ * 规范化节点文本（图谱节点以 msg 为主，兼容 message/text 字段）。
+ *
+ * 注意：真实图谱节点（graph-builder createNode 输出）的文本字段是 `msg`，
+ * message/text 仅作为旧数据或调用方自定义形状的兜底。
  *
  * @param {object} nodeData
  * @returns {string}
  */
 function getNodeText(nodeData) {
-  return String(nodeData?.message ?? nodeData?.text ?? '');
+  return String(nodeData?.message ?? nodeData?.msg ?? nodeData?.text ?? '');
+}
+
+/**
+ * 为索引条目解析全文（省内存模式下节点 msg 为截断预览）。
+ *
+ * 在指纹 diff 与向量化之前调用，保证内容哈希与向量质量不受设备画像影响；
+ * 同一节点的多会话条目共享一次解析。解析失败保持预览，不阻断构建。
+ *
+ * @param {Array<{chatFile: string, messageId: number, nodeData: object, externalId: string}>} entries
+ * @param {Function|null} resolveFullText - async (nodeData) => string|null。
+ * @returns {Promise<Array>} 新条目数组（原始数组不被修改）。
+ */
+export async function resolveEntryFullTexts(entries, resolveFullText) {
+  const source = Array.isArray(entries) ? entries : [];
+  if (typeof resolveFullText !== 'function') return source;
+
+  const resolvedCache = new Map(); // nodeData.id -> 解析后的 nodeData
+  const output = [];
+
+  for (const entry of source) {
+    const nodeData = entry?.nodeData;
+    if (!nodeData?.msgTruncated) {
+      output.push(entry);
+      continue;
+    }
+    const cacheKey = nodeData.id ?? entry.externalId;
+    if (!resolvedCache.has(cacheKey)) {
+      let next = nodeData;
+      try {
+        const full = await resolveFullText(nodeData);
+        if (typeof full === 'string' && full) {
+          next = { ...nodeData, msg: full };
+        }
+      } catch {
+        /* 解析失败保持预览 */
+      }
+      resolvedCache.set(cacheKey, next);
+    }
+    output.push({ ...entry, nodeData: resolvedCache.get(cacheKey) });
+  }
+
+  return output;
 }
 
 /**
@@ -249,14 +294,16 @@ export class SemanticIndexer {
    * @param {object} options.provider - embedding 提供方（createEmbeddingProvider 实例）。
    * @param {string} options.namespace - 索引命名空间（角色/群组作用域键）。
    * @param {Function} [options.onProgress] - ({phase, done, total, message}) => void。
+   * @param {Function} [options.resolveFullText] - async (nodeData) => string|null，省内存模式下解析节点全文。
    */
-  constructor({ client, provider, namespace, onProgress = null }) {
+  constructor({ client, provider, namespace, onProgress = null, resolveFullText = null }) {
     if (!client) throw new Error('SemanticIndexer 需要 Authority client');
     if (!provider) throw new Error('SemanticIndexer 需要 embedding provider');
     this.client = client;
     this.provider = provider;
     this.namespace = String(namespace ?? 'default');
     this.onProgress = typeof onProgress === 'function' ? onProgress : null;
+    this.resolveFullText = typeof resolveFullText === 'function' ? resolveFullText : null;
     this._cancelled = false;
     this._running = false;
   }
@@ -297,10 +344,11 @@ export class SemanticIndexer {
     this._cancelled = false;
 
     try {
-      const entries = enumerateIndexEntries(elements);
+      let entries = enumerateIndexEntries(elements);
       if (entries.length === 0) {
         return { database: null, upserted: 0, deleted: 0, unchanged: 0, links: 0 };
       }
+      entries = await resolveEntryFullTexts(entries, this.resolveFullText);
 
       // 1. 确保状态表存在并读取当前命名空间的索引状态
       await this.client.sql.migrate({ database: 'main', migrations: INDEX_STATE_MIGRATIONS });
@@ -468,6 +516,7 @@ export class SemanticIndexer {
  * @param {Function} [options.getHeaders] - 宿主鉴权头获取函数（getRequestHeaders）。
  * @param {boolean} [options.forceRebuild=false]
  * @param {Function} [options.onProgress]
+ * @param {Function} [options.resolveFullText] - async (nodeData) => string|null，省内存模式下解析节点全文。
  * @returns {Promise<object>} build 结果摘要。
  */
 export async function runSemanticIndexBuild({
@@ -477,6 +526,7 @@ export async function runSemanticIndexBuild({
   getHeaders = null,
   forceRebuild = false,
   onProgress = null,
+  resolveFullText = null,
 }) {
   const status = getAuthorityStatus();
   if (status.status !== 'ready') {
@@ -488,7 +538,7 @@ export async function runSemanticIndexBuild({
     batchSize: Number(settings.semanticBatchSize) || 8,
     getHeaders,
   });
-  const indexer = new SemanticIndexer({ client, provider, namespace, onProgress });
+  const indexer = new SemanticIndexer({ client, provider, namespace, onProgress, resolveFullText });
   return await indexer.build({ elements, forceRebuild });
 }
 

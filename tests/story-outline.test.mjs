@@ -134,3 +134,32 @@ test('formatStoryOutlineMarkdown outputs well-formed GitHub Flavored Markdown', 
   assert.ok(md.includes('## 📊 剧情统计看板'));
   assert.ok(md.includes('| 故事角色 | 莉莉娅 |'));
 });
+
+test('extractStoryOutline prefers fullTextMap entries for snippet and word counts', () => {
+  const rawData = [
+    { id: 'n1', name: 'User', is_user: true, msg: '开始。', depth: 0 },
+    { id: 'n2', name: 'Aria', is_user: false, msg: '预览...', depth: 1 },
+  ];
+  const mockNodes = rawData.map((d, i) => ({
+    id: () => d.id,
+    data: prop => (prop ? d[prop] : d),
+    outgoers: () => (i === 0 ? [{}] : []),
+    incomers: () => (i === 1 ? [{ source: () => mockNodes[0] }] : []),
+  }));
+  const mockCy = {
+    nodes: filterFn => (filterFn ? mockNodes.filter(filterFn) : mockNodes),
+    getElementById: id => mockNodes.find(n => n.id() === id) || null,
+  };
+  const mockContext = { characters: { '1': { name: 'Aria' } }, characterId: '1', chatId: 'Main.jsonl' };
+
+  const fullText = '这是被截断节点的完整全文内容，应当用于摘要与导出而不是预览。';
+  const fullTextMap = new Map([['n2', fullText]]);
+  const outline = extractStoryOutline(mockCy, mockContext, fullTextMap);
+
+  const event = outline.chapters.flatMap(c => c.events).find(e => e.nodeId === 'n2');
+  assert.ok(event, '事件应存在');
+  assert.equal(event.fullText, fullText);
+  assert.ok(event.textSnippet.includes('完整全文'));
+  // 字数统计使用全文而非预览
+  assert.ok(outline.stats.approxWords >= fullText.length);
+});

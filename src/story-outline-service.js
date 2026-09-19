@@ -62,9 +62,11 @@ export function summarizeTextSnippet(text, maxLen = 120) {
  *
  * @param {object} cy - Cytoscape 实例
  * @param {object} [context=null] - 当前酒馆运行上下文
+ * @param {Map<string, string>|null} [fullTextMap=null] - nodeId -> 全文映射；
+ *        省内存模式下节点 msg 为截断预览，调用方解析全文后传入，保证摘要与导出完整。
  * @returns {StoryOutlineData}
  */
-export function extractStoryOutline(cy, context = null) {
+export function extractStoryOutline(cy, context = null, fullTextMap = null) {
   const ctx = context || (typeof window !== 'undefined' ? (window.Luker?.getContext?.() || window.SillyTavern?.getContext?.()) : null);
   const characterName = ctx?.characters?.[ctx?.characterId]?.name || '剧情故事';
   const chatName = ctx?.chatId || ctx?.chatMetadata?.file_name || '主线';
@@ -119,7 +121,9 @@ export function extractStoryOutline(cy, context = null) {
     if (item.isUser) userTurns++;
     else charTurns++;
 
-    approxWords += (item.msg || '').length;
+    const eventText = (fullTextMap && fullTextMap.get(item.id)) || item.msg || '';
+
+    approxWords += eventText.length;
 
     // 提取彩色标签
     const nodeExtra = cyNode?.data?.('extra') || {};
@@ -135,8 +139,8 @@ export function extractStoryOutline(cy, context = null) {
       messageId: item.messageId !== undefined ? item.messageId : index + 1,
       senderName: item.name || (item.isUser ? 'User' : characterName),
       isUser: item.isUser,
-      textSnippet: summarizeTextSnippet(item.msg, 120),
-      fullText: item.msg || '',
+      textSnippet: summarizeTextSnippet(eventText, 120),
+      fullText: eventText,
       tags,
       isForkPoint,
       isBookmark,

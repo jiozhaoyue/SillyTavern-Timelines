@@ -110,7 +110,7 @@ export function matchesNode(nodeData, filterOptions = {}, parsedQuery = null) {
 
   // 6. 文本匹配 (若有查询词)
   if (queryObj.isRegex && queryObj.regex) {
-    const text = String(nodeData.message || nodeData.text || '');
+    const text = String(nodeData.message || nodeData.msg || nodeData.text || '');
     const name = String(nodeData.name || '');
     const tagText = tags.map(t => t.name).join(' ');
     const combined = `${name} ${text} ${tagText}`;
@@ -118,7 +118,7 @@ export function matchesNode(nodeData, filterOptions = {}, parsedQuery = null) {
   }
 
   if (queryObj.fragments && queryObj.fragments.length > 0) {
-    const text = String(nodeData.message || nodeData.text || '').toLowerCase();
+    const text = String(nodeData.message || nodeData.msg || nodeData.text || '').toLowerCase();
     const name = String(nodeData.name || '').toLowerCase();
     const tagText = tags.map(t => t.name.toLowerCase()).join(' ');
     const combined = `${name} ${text} ${tagText}`;

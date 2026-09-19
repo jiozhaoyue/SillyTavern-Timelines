@@ -93,3 +93,26 @@ test('filterGraphNodes filters collection and ignores cluster nodes', () => {
   // n3 is a cluster node, should be ignored
   assert.equal(allHello.length, 2);
 });
+
+test('matchesNode matches message text from real graph node data (msg field)', () => {
+  // 真实图谱节点（graph-builder createNode）的文本字段是 `msg`，而非 message/text
+  const node = {
+    id: 'message7',
+    msg: 'The ancient dragon guards the golden chest.',
+    name: 'Narrator',
+    is_user: false,
+    depth: 12,
+    chat_sessions: { 'chat-a.jsonl': { messageId: 12, indexInGroup: 12, length: 30 } },
+  };
+
+  // AND keywords via msg
+  assert.ok(matchesNode(node, { query: 'ancient dragon' }));
+  assert.ok(!matchesNode(node, { query: 'ancient silver' }));
+  // Regex via msg
+  assert.ok(matchesNode(node, { query: '/guard(s|ed)/i' }));
+  assert.ok(!matchesNode(node, { query: '/goblin/i' }));
+
+  const nodes = [{ data: node }];
+  assert.equal(filterGraphNodes(nodes, { query: 'dragon' }).length, 1);
+  assert.equal(filterGraphNodes(nodes, { query: 'wyvern' }).length, 0);
+});

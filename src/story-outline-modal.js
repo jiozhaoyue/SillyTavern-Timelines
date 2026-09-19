@@ -10,8 +10,32 @@ import {
 } from './story-outline-service.js';
 import { copyBlobToClipboard } from './export-service.js';
 import { escapeHtml } from './helpers.js';
+import { getFullNodeText } from './node-data.js';
 
 let outlineBackdrop = null;
+
+/**
+ * 为省内存模式预解析节点全文（nodeId -> 全文）。
+ *
+ * @param {object} cy - Cytoscape 实例。
+ * @returns {Promise<Map<string, string>>} 无截断节点或解析失败时对应条目缺失。
+ */
+async function buildFullTextMap(cy) {
+  const map = new Map();
+  if (!cy || typeof cy.nodes !== 'function') return map;
+  for (const node of cy.nodes()) {
+    if (!node.data('msgTruncated')) continue;
+    try {
+      const full = await getFullNodeText(node.data());
+      if (typeof full === 'string' && full) {
+        map.set(node.id(), full);
+      }
+    } catch {
+      /* 解析失败保持预览 */
+    }
+  }
+  return map;
+}
 
 /**
  * 打开全局故事大纲模态框
@@ -19,7 +43,7 @@ let outlineBackdrop = null;
  * @param {object} cy - Cytoscape 实例
  * @param {object} [context=null] - 当前酒馆运行上下文
  */
-export function openStoryOutlineModal(cy, context = null) {
+export async function openStoryOutlineModal(cy, context = null) {
   if (!cy) {
     toastr.warning('时间线尚未加载完成');
     return;
@@ -29,7 +53,8 @@ export function openStoryOutlineModal(cy, context = null) {
   if (existing) existing.remove();
 
   const ctx = context || (typeof window !== 'undefined' ? (window.Luker?.getContext?.() || window.SillyTavern?.getContext?.()) : null);
-  const outlineData = extractStoryOutline(cy, ctx);
+  const fullTextMap = await buildFullTextMap(cy);
+  const outlineData = extractStoryOutline(cy, ctx, fullTextMap);
 
   outlineBackdrop = document.createElement('div');
   outlineBackdrop.id = 'timelines-outline-backdrop';

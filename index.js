@@ -2589,6 +2589,7 @@ jQuery(async () => {
         settings,
         getHeaders: () => getRequestHeaders(),
         forceRebuild,
+        resolveFullText: getFullNodeText,
         onProgress: p => {
           $('#tl_semantic_status').text(`语义索引状态：${p.message ?? p.phase} (${p.done}/${p.total})`);
         },

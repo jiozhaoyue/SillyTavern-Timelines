@@ -8,6 +8,7 @@ import {
   enumerateIndexEntries,
   diffIndexState,
   buildFloorLinks,
+  resolveEntryFullTexts,
 } from '../src/semantic-index-service.js';
 
 test('encode/decode externalId roundtrip with .jsonl normalization', () => {
@@ -186,4 +187,54 @@ test('buildFloorLinks chains consecutive floors within the same chat only', () =
   assert.ok(links.every(l => Number(l.src.externalId.split('::')[1]) < Number(l.dst.externalId.split('::')[1])));
   assert.deepEqual(buildFloorLinks([]), []);
   assert.deepEqual(buildFloorLinks(null), []);
+});
+
+test('buildNodePayload and content hash read real graph msg field', () => {
+  const node = {
+    id: 'message1',
+    msg: '真实图节点的文本内容',
+    name: 'Aria',
+    is_user: false,
+    chat_sessions: { 'c.jsonl': { messageId: 1, indexInGroup: 1, length: 10 } },
+  };
+
+  const payload = buildNodePayload(node, 'c.jsonl', 1);
+  assert.ok(payload.preview.includes('真实图节点的文本内容'));
+
+  const h1 = computeContentHash(node, 'c', 1);
+  assert.notEqual(h1, computeContentHash({ ...node, msg: '内容变化后' }, 'c', 1));
+});
+
+test('resolveEntryFullTexts resolves truncated previews once per node and keeps failures on preview', async () => {
+  const sharedNode = { id: 'message1', msg: '预览...', msgTruncated: true };
+  const entries = [
+    { chatFile: 'a', messageId: 0, externalId: 'a::0', nodeData: sharedNode },
+    { chatFile: 'b', messageId: 0, externalId: 'b::0', nodeData: sharedNode },
+    { chatFile: 'b', messageId: 1, externalId: 'b::1', nodeData: { id: 'message2', msg: '全文2', msgTruncated: true } },
+  ];
+
+  let calls = 0;
+  const out = await resolveEntryFullTexts(entries, async () => {
+    calls += 1;
+    return '完整全文';
+  });
+  assert.equal(calls, 2); // 同一节点的多条目共享一次解析
+  assert.equal(out[0].nodeData.msg, '完整全文');
+  assert.equal(out[1].nodeData.msg, '完整全文');
+  assert.equal(out[2].nodeData.msg, '完整全文');
+  // 原数组与原节点不被修改
+  assert.equal(entries[0].nodeData.msg, '预览...');
+  assert.equal(sharedNode.msg, '预览...');
+
+  // 解析失败保持预览
+  const failed = await resolveEntryFullTexts(entries, async () => {
+    throw new Error('boom');
+  });
+  assert.equal(failed[0].nodeData.msg, '预览...');
+
+  // 未截断条目原样通过；缺省 resolver 时返回原数组
+  const plain = [{ chatFile: 'a', messageId: 0, externalId: 'a::0', nodeData: { id: 'm', msg: '全文' } }];
+  const passthrough = await resolveEntryFullTexts(plain, async () => 'x');
+  assert.equal(passthrough[0].nodeData.msg, '全文');
+  assert.equal(await resolveEntryFullTexts(entries, null), entries);
 });
