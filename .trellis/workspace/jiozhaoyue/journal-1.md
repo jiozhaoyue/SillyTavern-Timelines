@@ -498,3 +498,52 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 16: 仓库卫生修复与细腰图展开全文功能
+<!-- trellis-session: v=2 fp=1e3b3e8150b0f2ae -->
+
+**Date**: 2026-09-19
+**Task**: 仓库卫生修复与细腰图展开全文功能
+**Branch**: `codex-luker-chinese-refactor`
+
+### Summary
+
+仓库卫生（gitignore/解除 .codex 跟踪/清理重复文件/还原回归改动）＋ 细腰图展开全文功能落地 ＋ WIKI/README 文档补齐
+
+### Main Changes
+
+### Summary
+
+仓库卫生修复（.gitignore/解除 .codex 跟踪/清理重复文件/还原 layout-service 回归改动）＋ 细腰图「展开全文」功能落地（接通死代码 getFullNodeText、补齐 swipe 变体还原）＋ WIKI/README 文档补齐 Session 14/15 特性
+
+### Main Changes
+
+- 新增根目录 .gitignore（忽略 .history/.codex/.claude/.cursor、验证截图与运行时缓存）；git rm --cached 移除误提交的 24MB Chrome profile（348 文件）；删除根目录 13 个与 vendor/ 完全相同的库副本与 5 个无引用 tl_* 垫片；提交 Trellis 初始化脚手架与 .gitattributes
+- 还原 src/layout-service.js 中未提交的回归改动（重复 postMessage + 未过滤函数的原始 layoutOptions 会导致 DataCloneError）
+- 新增 src/node-text.js 纯函数模块：从 IndexedDB 缓存消息解析节点全文（普通节点取楼层 mes，swipe 节点还原 swipes[swipeId] 变体），Node 可测
+- src/node-data.js getFullNodeText 改用统一解析器；index.js 节点详情面板将静态截断提示替换为「展开全文/收起」交互按钮（加载态 + 失败回退 + 保留搜索高亮）
+- WIKI.md 新增 3.6 渐进式渲染与细腰图、4.13 语义检索（可选 Authority）章节，目录树补 9 模块，测试矩阵 78+ → 118+；README 功能矩阵补 2 条特性
+- 确认 ST 的 context.characterId 为字符串化索引（"0" 为真值），现有 isGroupChat 判定无误，未做无谓改动
+
+### Testing
+
+- [OK] 全量 118 项单元测试 100% 通过（新增 tests/node-text.test.mjs 8 项）
+- [OK] node --check index.js 语法校验通过
+
+### Next Steps
+
+- 可选迭代：iOS 移动端点击 TODO、边标签（edge labels）、更多上下文菜单项（index.js 顶部遗留 TODO 清单）
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `316b3d9` | chore(repo): 仓库卫生——补 .gitignore、解除 .codex 浏览器配置跟踪、删除根目录重复文件 |
+| `c917719` | feat(ux): 细腰图节点详情面板就地展开全文——接通按需全文解析并补齐 swipe 变体还原 |
+| `c7ba1cb` | docs(wiki): 补齐渐进式渲染/细腰图与语义检索文档——WIKI 3.6 与 4.13 章节、测试矩阵 118+、README 功能矩阵 |
+
+### Status
+
+[OK] **Completed**
