@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 17
+- **Total Sessions**: 18
 - **Last Active**: 2026-09-19
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~595 | Active |
+| `journal-1.md` | ~650 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 18 | 2026-09-19 | 行为审计修复轮：tooltip 泄漏/字段错位/全文消费链贯通 | `5084206`, `4e98cb9`, `1267ffd`, `57cb0d9`, `064f281` | `codex-luker-chinese-refactor` |
 | 17 | 2026-09-19 | 复制消息全文——右键菜单与详情面板剪贴板支持 | `d6714e4` | `codex-luker-chinese-refactor` |
 | 16 | 2026-09-19 | 仓库卫生修复与细腰图展开全文功能 | `316b3d9`, `c917719`, `c7ba1cb` | `codex-luker-chinese-refactor` |
 | 15 | 2026-09-13 | 极端内存优化与渐进式渲染：画布先行+后台加载+全程进度 | `3b1220c`, `9fe18c6` | `codex-luker-chinese-refactor` |

@@ -593,3 +593,58 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 18: 行为审计修复轮：tooltip 泄漏/字段错位/全文消费链贯通
+<!-- trellis-session: v=2 fp=42b8af6b6b87dbeb -->
+
+**Date**: 2026-09-19
+**Task**: 行为审计修复轮：tooltip 泄漏/字段错位/全文消费链贯通
+**Branch**: `codex-luker-chinese-refactor`
+
+### Summary
+
+tooltip DOM 泄漏与 hover 缓存、LOD 跨角色残留、三处字段错位（检索/语义/筛选）修复与全文解析注入
+
+### Main Changes
+
+### Summary
+
+系统性行为审计修复轮：tooltip DOM 累积泄漏、LOD 展开集合跨角色残留、hover 重复 Markdown 转换、空文本节点 "undefined"，以及三处 fixture 形状掩盖的严重字段错位（雷达检索/语义索引/楼层筛选从未在真实数据上生效）
+
+### Main Changes
+
+- tooltip 生命周期：四条路径（node/edge mouseout、tap 预检、closeTapTippy）此前只 hide 不 destroy，popper（appendTo: body）永久残留；新增 destroyElementTippy 统一销毁，renderCytoscapeDiagram 销毁旧图前清理
+- hover 性能：truncateMessage 提升为模块级 + hoverTooltipFormatCache（WeakMap 按 msg 缓存 Markdown 结果），悬停不再重跑 showdown
+- 详情面板空文本节点显示友好占位；清理 context-menu 未使用导入
+- LOD：expandedClusterIds 随上下文 key 变化清空（跨角色 clusterId 同构误命中）
+- 严重字段错位（单测 fixture 用 message/depth/swipes 掩盖）：
+  - search-service matchesNode 文本匹配 → 真实字段 msg；重试筛选 → totalSwipes/isSwipe；楼层筛选 → chat_depth（此前词法检索只命中名字标签、重试与楼层筛选从未生效）
+  - semantic-index getNodeText → msg（此前把 externalId 当正文向量化、指纹不含正文）
+  - SemanticIndexer 注入 resolveFullText（resolveEntryFullTexts 按节点去重解析全文），省内存模式向量质量与指纹不受影响；index.js 传 getFullNodeText
+- extractStoryOutline 支持 fullTextMap，大纲弹窗预解析截断节点全文；旧版搜索确认读 msg 无需修复
+
+### Testing
+
+- [OK] 全量 124 项单元测试 100% 通过（新增 6 项回归测试覆盖真实节点形状）
+- [OK] node --check 全部改动文件通过
+
+### Next Steps
+
+- 雷达语义模式的跨会话弹窗在 Authority 未建索引时的空结果提示
+- 边标签 TODO（低价值，可评估后关闭）；实验性多树视图（大特性）
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5084206` | fix(perf): hover 提示按 msg 内容缓存格式化结果；修复空文本节点详情面板渲染 "undefined" |
+| `4e98cb9` | fix(memory): 修复 tooltip popper 在 body 上永久残留的 DOM 累积泄漏 |
+| `1267ffd` | fix(lod): 切换角色/群组后清空手动展开集合，避免跨上下文状态残留 |
+| `57cb0d9` | fix(critical): 修复检索与语义索引读取真实图节点的字段错位——msg 消费链路贯通全文解析 |
+| `064f281` | fix(search): 雷达重试与楼层筛选适配真实图谱节点形状——totalSwipes/isSwipe/chat_depth |
+
+### Status
+
+[OK] **Completed**
