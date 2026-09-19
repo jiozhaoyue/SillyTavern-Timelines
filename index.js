@@ -491,30 +491,58 @@ function makeTippy(ele, text, pos) {
  * @param {Object} node - The Cytoscape node.
  * @returns {Object} The Tippy tooltip.
  */
-function makeNodeTippy(node) {
-  // Return a truncated version of `msg` for use in a tooltip.
-  const truncateMessage = (msg, length = 100) => {
-    if (msg === undefined) {
-      return '';
-    }
-    msg = msg.trim();
-    if (msg.length <= length) {
-      return msg;
-    }
-    // Truncate at a whole-word boundary, to show search highlights accurately (a single swoop fragment cannot span several words).
-    // Also, trim extra whitespace while at it.
-    const words = msg.split(/\s+/).map(function (str) {
-      return str.trim();
-    });
-    let out = words[0];
-    let j = 1;
-    while (out.length < length - 3) {
-      out = `${out} ${words[j]}`;
-      j++;
-    }
-    return out + '...';
-  };
+/**
+ * Return a truncated version of `msg` for use in a tooltip.
+ *
+ * @param {string} msg - 节点消息文本。
+ * @param {number} length - 目标最大长度。
+ * @returns {string}
+ */
+function truncateTooltipMessage(msg, length = 100) {
+  if (msg === undefined) {
+    return '';
+  }
+  msg = msg.trim();
+  if (msg.length <= length) {
+    return msg;
+  }
+  // Truncate at a whole-word boundary, to show search highlights accurately (a single swoop fragment cannot span several words).
+  // Also, trim extra whitespace while at it.
+  const words = msg.split(/\s+/).map(function (str) {
+    return str.trim();
+  });
+  let out = words[0];
+  let j = 1;
+  while (out.length < length - 3) {
+    out = `${out} ${words[j]}`;
+    j++;
+  }
+  return out + '...';
+}
 
+const hoverTooltipFormatCache = new WeakMap(); // cy 节点 -> { msg, html }，避免每次悬停重跑 Markdown 转换
+
+/**
+ * 取得节点 hover tooltip 的格式化消息 HTML。
+ *
+ * 按 msg 内容缓存（增量补丁更新节点 data 后 msg 变化即自动重算）；
+ * 搜索高亮与修饰器前缀依赖实时状态，不进入缓存。
+ *
+ * @param {Object} node - Cytoscape 节点。
+ * @returns {string} 已格式化的 HTML 片段。
+ */
+function getHoverTooltipMsgHtml(node) {
+  const msg = node.data('msg');
+  const cached = hoverTooltipFormatCache.get(node);
+  if (cached && cached.msg === msg) {
+    return cached.html;
+  }
+  const html = formatNodeMessage(truncateTooltipMessage(msg));
+  hoverTooltipFormatCache.set(node, { msg, html });
+  return html;
+}
+
+function makeNodeTippy(node) {
   if (node.data('isCollapsedCluster')) {
     const count = node.data('collapsedCount') || 0;
     const content = `<b>📦 已折叠单链 (+${count} 轮)</b><br><span style="color:#94a3b8;font-size:0.85em">点击直接展开此段对话</span>`;
@@ -523,7 +551,7 @@ function makeNodeTippy(node) {
     return tippy;
   }
 
-  const truncatedMsg = formatNodeMessage(truncateMessage(node.data('msg')));
+  const truncatedMsg = getHoverTooltipMsgHtml(node);
   const prefixes = getNodeDecorators()
     .map(d => (typeof d.getTooltipPrefix === 'function' ? d.getTooltipPrefix(node) : ''))
     .join('');
@@ -867,6 +895,9 @@ function makeTapTippy(ele) {
         // 根节点没有消息，只有 AI 角色名，因此不应使用 `mes_text` class。
         // 这样可让根节点的 Tippy 与 TapTippy 布局一致。
         formattedMsg = `<small><i>此节点代表这组时间线中的 AI 角色${String(ele.data('name') ?? '').includes(', ') ? '们' : ''}。</i></small>`;
+      } else {
+        // 空文本消息节点（如仅含图片的楼层）避免渲染出字面量 "undefined"
+        formattedMsg = '<small><i>此节点没有文本内容。</i></small>';
       }
       if (!ele.data('msg')) {
         mesDiv.innerHTML = formattedMsg;

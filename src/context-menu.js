@@ -6,7 +6,6 @@
 import { branchManager } from './branch-manager.js';
 import { showDiffModal } from './diff-modal.js';
 import { computeBranchLCA, extractPathToRoot } from './diff-service.js';
-import { escapeHtml } from './helpers.js';
 import { navigateToMessage, copyTextToClipboard } from './utils.js';
 import { getFullNodeText } from './node-data.js';
 import { getContextMenuActions } from './api.js';
