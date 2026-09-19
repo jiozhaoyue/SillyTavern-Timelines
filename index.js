@@ -117,7 +117,7 @@ import { openSnapshotGalleryModal } from './src/snapshot-modal.js';
 import { SearchRadar } from './src/search-radar.js';
 import { fetchData, prepareDataProgressive, getFullNodeText } from './src/node-data.js';
 import { highlightElements, restoreElements, setupStylesAndData } from './src/style.js';
-import { closeModal, closeOpenDrawers, closeTippy, handleModalDisplay, navigateToMessage } from './src/utils.js';
+import { closeModal, closeOpenDrawers, closeTippy, handleModalDisplay, navigateToMessage, copyTextToClipboard } from './src/utils.js';
 
 registerTimelinesExtensionApi();
 initTagDecorator();
@@ -839,6 +839,29 @@ function makeTapTippy(ele) {
             }
           });
           mesDiv.appendChild(expandBtn);
+          const copyBtn = document.createElement('button');
+          copyBtn.classList.add('menu_button');
+          copyBtn.style.marginTop = '6px';
+          copyBtn.style.marginLeft = '6px';
+          copyBtn.style.fontSize = '0.85em';
+          copyBtn.textContent = '📋 复制全文';
+          copyBtn.addEventListener('click', async () => {
+            copyBtn.disabled = true;
+            try {
+              const fullText = await getFullNodeText(ele.data());
+              const ok = fullText ? await copyTextToClipboard(fullText) : false;
+              copyBtn.textContent = ok ? '✅ 已复制' : '⚠️ 复制失败';
+            } catch (err) {
+              console.warn('Timelines: 复制节点全文失败：', err);
+              copyBtn.textContent = '⚠️ 复制失败';
+            } finally {
+              copyBtn.disabled = false;
+              setTimeout(() => {
+                copyBtn.textContent = '📋 复制全文';
+              }, 1500);
+            }
+          });
+          mesDiv.appendChild(copyBtn);
         }
       } else if (ele.data('id') === 'root') {
         // 根节点没有消息，只有 AI 角色名，因此不应使用 `mes_text` class。

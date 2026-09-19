@@ -7,7 +7,8 @@ import { branchManager } from './branch-manager.js';
 import { showDiffModal } from './diff-modal.js';
 import { computeBranchLCA, extractPathToRoot } from './diff-service.js';
 import { escapeHtml } from './helpers.js';
-import { navigateToMessage } from './utils.js';
+import { navigateToMessage, copyTextToClipboard } from './utils.js';
+import { getFullNodeText } from './node-data.js';
 import { getContextMenuActions } from './api.js';
 import { openManageTagsModal } from './tag-manager.js';
 
@@ -90,6 +91,31 @@ export function initContextMenu(cy, { onReload, onExport, onOutline, onAnalytics
       onClickFunction: event => {
         const node = event.target || event.cyTarget;
         openManageTagsModal(node);
+      },
+    },
+    {
+      id: 'tl-copy-message',
+      content: '📋 复制消息全文',
+      tooltipText: '复制该节点对应楼层的完整消息文本（swipe 节点复制对应变体）',
+      selector: 'node[?msg]',
+      onClickFunction: async event => {
+        const node = event.target || event.cyTarget;
+        try {
+          const text = await getFullNodeText(node.data());
+          if (!text) {
+            toastr.warning('该节点没有可复制的文本。');
+            return;
+          }
+          const ok = await copyTextToClipboard(text);
+          if (ok) {
+            toastr.success('已复制消息全文到剪贴板。');
+          } else {
+            toastr.error('复制失败：浏览器拒绝了剪贴板访问。');
+          }
+        } catch (err) {
+          console.error('Timelines: 复制消息全文失败：', err);
+          toastr.error('复制消息全文失败。');
+        }
       },
     },
     ...dynamicItems,

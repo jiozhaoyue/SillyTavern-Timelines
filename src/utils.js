@@ -187,6 +187,45 @@ export function closeTippy() {
 }
 
 /**
+ * 将文本复制到剪贴板（优先 Clipboard API，非安全上下文回退 execCommand）。
+ *
+ * @param {string} text - 要复制的文本。
+ * @returns {Promise<boolean>} 是否复制成功。
+ */
+export async function copyTextToClipboard(text) {
+    const value = String(text ?? '');
+    if (!value) return false;
+
+    if (navigator.clipboard && window.isSecureContext) {
+        try {
+            await navigator.clipboard.writeText(value);
+            return true;
+        } catch (err) {
+            console.warn('Timelines: Clipboard API 复制失败，尝试回退方案：', err);
+        }
+    }
+
+    // 回退方案：临时 textarea + execCommand（兼容 http 部署与旧 WebView）
+    try {
+        const textarea = document.createElement('textarea');
+        textarea.value = value;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        textarea.style.pointerEvents = 'none';
+        document.body.appendChild(textarea);
+        textarea.select();
+        textarea.setSelectionRange(0, value.length);
+        const ok = document.execCommand('copy');
+        textarea.remove();
+        return ok;
+    } catch (err) {
+        console.warn('Timelines: execCommand 复制失败：', err);
+        return false;
+    }
+}
+
+/**
  * Manages the display state and behavior of the modal with ID "timelinesModal".
  * - Appends the modal to the body and shows it when called.
  * - Appends the modal back to its original parent in the DOM when it's closed.
