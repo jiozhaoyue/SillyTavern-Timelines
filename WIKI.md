@@ -21,6 +21,7 @@
   - [3.3 Web Worker 异步 Dagre 布局](#33-web-worker-异步-dagre-布局)
   - [3.4 动态智能长链抽稀折叠 (LOD)](#34-动态智能长链抽稀折叠-lod)
   - [3.5 双缓冲 Canvas 全景小地图与几何投影](#35-双缓冲-canvas-全景小地图与几何投影)
+  - [3.6 渐进式渲染管线与极端内存优化（细腰图）](#36-渐进式渲染管线与极端内存优化细腰图)
 - [4. 全功能交互与实操手册](#4-全功能交互与实操手册)
   - [4.1 全景拓扑交互与视口操作](#41-全景拓扑交互与视口操作)
   - [4.2 顶部折叠式全景小地图与鸟瞰快速穿梭](#42-顶部折叠式全景小地图与鸟瞰快速穿梭)
@@ -34,6 +35,7 @@
   - [4.10 智能全景雷达与多维复合检索器](#410-智能全景雷达与多维复合检索器)
   - [4.11 4K/8K 超大画幅高保真导出与无依赖 SVG 矢量图](#411-4k8k-超大画幅高保真导出与无依赖-svg-矢量图)
   - [4.12 移动端捏合缩放、长按防抖与响应式适配](#412-移动端捏合缩放长按防抖与响应式适配)
+  - [4.13 语义检索与跨会话搜索（可选 Authority 集成）](#413-语义检索与跨会话搜索可选-authority-集成)
 - [5. 开放扩展 API 与生态互通规范](#5-开放扩展-api-与生态互通规范)
   - [5.1 window.TimelinesExtensionApi 核心规范](#51-windowtimelinesextensionapi-核心规范)
   - [5.2 微内核修饰器注册 (registerNodeDecorator)](#52-微内核修饰器注册-registernodedecorator)
@@ -41,7 +43,7 @@
   - [5.4 拓扑因果溯源与最近公共祖先 (LCA) 计算](#54-拓扑因果溯源与最近公共祖先-lca-计算)
 - [6. 开发者与测试规范](#6-开发者与测试规范)
   - [6.1 目录拓扑说明](#61-目录拓扑说明)
-  - [6.2 自动化测试套件 (78+ 单元测试)](#62-自动化测试套件-78-单元测试)
+  - [6.2 自动化测试套件 (118+ 单元测试)](#62-自动化测试套件-118-单元测试)
   - [6.3 基于 Chrome DevTools Protocol (CDP) 的端到端自动化验证](#63-基于-chrome-devtools-protocol-cdp-端到端自动化验证)
 
 ---
@@ -51,12 +53,13 @@
 ### 1.1 项目背景与演进路线
 SillyTavern-Timelines 原生旨在为大语言模型角色扮演（LLM Roleplay）与分支叙事交互式故事提供基于 DAG（有向无环图）的可视化探索能力。玩家在多分支会话、重试生成（Swipes）、检查点创建中穿梭，传统的单线聊天列表无法表达故事全貌。
 
-本项目在经历全面重构后，不仅攻克了千节点级渲染卡顿、Worker 布局阻塞、移动端手势冲突等性能壁垒，更构建了涵盖**差异对比、单消息采摘合并、故事大纲梳理、量化数据看板、时光机归档、智能搜索雷达、高保真矢量导出**的工业级叙事探索工作台。
+本项目在经历全面重构后，不仅攻克了千节点级渲染卡顿、Worker 布局阻塞、移动端手势冲突等性能壁垒，更构建了涵盖**差异对比、单消息采摘合并、故事大纲梳理、量化数据看板、时光机归档、智能搜索雷达、渐进式渲染与细腰图内存极压、语义跨会话检索、高保真矢量导出**的工业级叙事探索工作台。
 
 ### 1.2 核心哲学：非破坏性与零私有数据库
 - **严格基于原生文件**：绝不在插件目录下建立独立的私有 SQLite、LevelDB 或 IndexedDB 专有数据库。所有的节点、分支、书签、彩色标签、快照命名均存储在酒馆原生的会话文件（`chat.jsonl`）的 `message.extra` 契约中。
 - **无破坏性与可逆性**：卸载本插件后，原生的所有会话记录完好无损，酒馆原生核心引擎对 `message.extra` 的读取完全透明合规。
 - **只读分析与原生委托写**：插件所有写操作（如打标签、修改书签、合并分支）均委托给原生酒馆的核心 API（如 `saveChatDebounced`、`createBranch`、`openCharacterChat`），绝不擅自使用 Node.js 直接覆写用户聊天文件。
+- **派生投影而非私有数据**：可选语义检索（Trivium 向量索引）完全寄生于外部可选的 Authority 服务，其全部数据（向量索引 + `index_state` 状态表）均为原生 `message.extra` 的**可随时删除重建的派生投影**；未安装 Authority 时零依赖、零行为变化。
 
 ### 1.3 微内核总线与生态解耦架构
 所有对外暴露的能力、第三方扩展集成（如“记忆图谱 Memory Graph”）均通过解耦总线 `src/api.js` (`window.TimelinesExtensionApi`) 进行交互。第三方扩展无需修改 Timelines 内部任何源码，只需注册 Decorator 或监听广播事件即可完成无缝图谱装配。
@@ -133,6 +136,16 @@ SillyTavern-Timelines 原生旨在为大语言模型角色扮演（LLM Roleplay�
 - 采用离屏 Double-buffering Canvas 渲染拓扑简图，避免主画布频繁重绘。
 - 提供基于仿射变换（Affine Projection）的视口数学转换，实时在小地图上投射当前相机的取景框矩形。
 - 支持在小地图上直接点击与拖拽，实现毫秒级相机居中穿梭。
+
+### 3.6 渐进式渲染管线与极端内存优化（细腰图）
+位于 `src/node-data.js`、`src/incremental-merge.js`、`src/load-progress.js`、`src/memory-profile.js`：
+
+- **画布先行（Canvas First）**：点击打开时间线不再出现全屏加载遮罩，空骨架画布立即呈现，数据管线完全后台化。
+- **渐进数据管线 (`prepareDataProgressive`)**：以单文件粒度产出会话数据——当前活跃会话最先上屏（用户所在分支优先可见）→ IndexedDB 缓存命中分块回放 → 网络按画像并发拉取；每个文件就绪即刻触发增量渲染，不等整批。
+- **增量补丁 (`incremental-merge.js`)**：加载期间以 600ms 节流执行 rebuild，并做 id 级 diff 增量补丁上屏，避免大图反复全量重绘。
+- **全程进度胶囊 (`load-progress.js`)**：常驻进度胶囊按阶段权重展示百分比与实时文件名，完成自动淡出、失败红态提示。
+- **设备画像 (`memory-profile.js`)**：按内存 / 核数 / 触屏特征自动判定档位（`auto/on/off` 三档设置）——弱设备自动启用"细腰图"省内存模式：节点文本截断为预览（移动端 160 字、桌面端 240 字）、网络并发降为 4；强设备保持全文渲染，行为与旧版逐字节一致。
+- **按需全文 (`getFullNodeText` / `src/node-text.js`)**：细腰图节点的详情面板提供「展开全文」就地还原原始楼层消息（swipe 节点还原对应 swipes 变体），可随时收起回预览态；解析失败优雅回退预览。
 
 ---
 
@@ -249,6 +262,23 @@ SillyTavern-Timelines 原生旨在为大语言模型角色扮演（LLM Roleplay�
 - **长按唤起菜单**：针对触控屏长按（`taphold`），自动转换坐标并精准在手指触点弹出上下文操作菜单。
 - **响应式排版**：所有弹窗（大纲、看板、时光机、Diff 对比）在屏幕宽度小于 768px 时自动切换为单列排版与满屏自适应，按钮尺寸符合移动端 38px 触控标准。
 
+### 4.13 语义检索与跨会话搜索（可选 Authority 集成）
+本插件默认**零依赖、零行为变化**；当宿主环境安装了可选的外部服务 ST-Delegation-of-authority（Authority）时，自动解锁语义检索能力：
+
+- **设置面板**（扩展设置 → 语义检索）：
+  - `启用语义检索`：总开关，开启后搜索雷达自动追加语义模式入口。
+  - `Embedding 端点` 与 `批量大小`：对接宿主向量化接口（默认 `/api/embeddings/compute`）。
+  - 面板实时显示 Authority 就绪状态与索引统计（节点数、向量维度、最近索引时间）。
+- **语义索引构建 (`src/semantic-index-service.js`)**：
+  - 直接枚举当前图谱的 `chat_sessions` 覆盖全部 (会话, 楼层)，以 `content_hash` 内容指纹做增量 diff，只重索引新增或变化条目。
+  - externalId 契约：`<chatFile>::<messageId>`；向量维度进入库名（`tl_vec_<dim>`），embedding 后端更换导致维度变化时天然切库、绝不混维度。
+  - 同会话相邻楼层自动合成 `next` 图链边，辅助上下文邻近召回。
+- **雷达语义模式 (`src/semantic-search-service.js`)**：
+  - Trivium `searchHybrid` 向量 + BM25 双通道混合检索（权重 0.5）。
+  - 命中映射回当前内存图谱节点：已打开分支重排聚焦；未映射命中（其他分支会话）进入**跨会话结果弹窗**，显示会话名、楼层、角色与预览，一键时空穿越跳转对应楼层。
+- **熔断降级 (`src/embedding-provider.js`)**：embedding 接口连续失败时自动熔断，本次会话内回退纯文本检索，绝不阻塞主流程。
+- **数据哲学**：索引与状态表全部是原生数据的派生投影，删除 Authority 数据即等于重置，可随时全量重建。
+
 ---
 
 ## 5. 开放扩展 API 与生态互通规范
@@ -348,14 +378,24 @@ SillyTavern-Timelines/
 │   ├── snapshot-modal.js        # 时光机存档画廊与时空穿越弹窗
 │   ├── search-service.js        # 正则与多维复合检索纯算法
 │   ├── search-radar.js          # 全景雷达遍历控制器
+│   ├── node-data.js             # 渐进式数据管线与节点全文解析
+│   ├── node-text.js             # 细腰图全文还原纯逻辑（含 swipe 变体）
+│   ├── memory-profile.js        # 设备画像判定与预览截断纯算法
+│   ├── load-progress.js         # 常驻进度胶囊状态机
+│   ├── incremental-merge.js     # id 级增量补丁纯算法
+│   ├── semantic-index-service.js # Authority 语义索引（Trivium 写入与增量 diff）
+│   ├── semantic-search-service.js # 语义混合检索与跨会话结果格式化
+│   ├── semantic-global-modal.js # 跨会话语义结果弹窗
+│   ├── embedding-provider.js    # embedding 提供方与熔断降级
 │   ├── export-service.js        # 4K/8K 导出与 SVG 矢量生成器
 │   ├── export-modal.js          # 导出参数配置弹窗
 │   └── adapters/
-│       └── memory-graph-adapter.js # 记忆图谱零耦合微内核适配器
-└── tests/                       # 全量自动化测试套件 (78+ 单元测试)
+│       ├── memory-graph-adapter.js # 记忆图谱零耦合微内核适配器
+│       └── authority-adapter.js # Authority 可选接入状态机与最小权限嗅探
+└── tests/                       # 全量自动化测试套件 (118+ 单元测试)
 ```
 
-### 6.2 自动化测试套件 (78+ 单元测试)
+### 6.2 自动化测试套件 (118+ 单元测试)
 本项目拥有 100% 覆盖关键业务逻辑的 Node.js 原生测试体系：
 ```bash
 # 执行全量单元测试
@@ -374,6 +414,15 @@ node --test tests/*.test.mjs
 - `tests/analytics.test.mjs`：中英文混合字数、角色天平与 Swipes 统计测试
 - `tests/snapshots.test.mjs`：时光机检查点扫描、时序排序与过滤测试
 - `tests/search-radar.test.mjs`：正则表达式语法、多维复合条件与调光逻辑测试
+- `tests/authority-adapter.test.mjs`：Authority 接入状态机与最小权限嗅探测试
+- `tests/embedding-provider.test.mjs`：embedding 批处理、文本哈希与熔断降级测试
+- `tests/semantic-index.test.mjs`：externalId 编解码、payload 构建与增量 diff 测试
+- `tests/semantic-search.test.mjs`：命中映射、跨会话结果格式化与混合检索测试
+- `tests/incremental-merge.test.mjs`：id 级 diff 增量补丁测试
+- `tests/load-progress.test.mjs`：进度胶囊阶段权重状态机测试
+- `tests/memory-profile.test.mjs`：设备画像判定与文本截断测试
+- `tests/node-text.test.mjs`：细腰图全文还原（含 swipe 变体）测试
+- `tests/layout-service.test.mjs`：Worker 布局服务优雅降级测试
 
 ### 6.3 基于 Chrome DevTools Protocol (CDP) 端到端自动化验证
 在本地真实酒馆/Luker 实例运行环境下，测试脚本可通过 Chrome 调试协议直接验证 UI 渲染与功能交互：
