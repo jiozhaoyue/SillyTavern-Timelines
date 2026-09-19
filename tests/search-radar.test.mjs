@@ -116,3 +116,35 @@ test('matchesNode matches message text from real graph node data (msg field)', (
   assert.equal(filterGraphNodes(nodes, { query: 'dragon' }).length, 1);
   assert.equal(filterGraphNodes(nodes, { query: 'wyvern' }).length, 0);
 });
+
+test('matchesNode swipe and floor filters work on real graph node shape', () => {
+  // 真实图谱节点：父节点带 totalSwipes / chat_depth，swipe 变体节点带 isSwipe/swipeId
+  const parentWithSwipes = { id: 'm1', msg: '有重试的节点', totalSwipes: 3, chat_depth: 8 };
+  const parentWithoutSwipes = { id: 'm2', msg: '没有重试的节点', totalSwipes: 0, chat_depth: 9 };
+  const swipeNode = { id: 'swipe1', msg: 'swipe 变体', isSwipe: true, swipeId: 1, chat_depth: 8 };
+  const plainNode = { id: 'm3', msg: '普通节点', chat_depth: 2 };
+
+  // 仅含分支重试：totalSwipes > 1 的父节点与 swipe 变体节点命中
+  assert.ok(matchesNode(parentWithSwipes, { onlySwipes: true }));
+  assert.ok(matchesNode(swipeNode, { onlySwipes: true }));
+  assert.ok(!matchesNode(parentWithoutSwipes, { onlySwipes: true }));
+  assert.ok(!matchesNode(plainNode, { onlySwipes: true }));
+
+  // 楼层切片：chat_depth 参与范围比较
+  assert.ok(matchesNode(parentWithSwipes, { minFloor: 5, maxFloor: 10 }));
+  assert.ok(!matchesNode(parentWithSwipes, { minFloor: 9 }));
+  assert.ok(matchesNode(plainNode, { maxFloor: 5 }));
+  assert.ok(!matchesNode(plainNode, { minFloor: 5 }));
+
+  // 组合：重试 + 楼层
+  assert.ok(matchesNode(parentWithSwipes, { onlySwipes: true, minFloor: 5 }));
+  assert.ok(!matchesNode(parentWithSwipes, { onlySwipes: true, minFloor: 20 }));
+});
+
+test('filterGraphNodes keeps legacy message/swipes/swipe_id shapes working', () => {
+  const legacy = { data: { id: 'x', message: 'legacy text hello', swipes: ['a', 'b', 'c'], depth: 4 } };
+  assert.ok(matchesNode(legacy.data, { query: 'hello' }));
+  assert.ok(matchesNode(legacy.data, { onlySwipes: true }));
+  assert.ok(matchesNode(legacy.data, { minFloor: 3, maxFloor: 6 }));
+  assert.ok(!matchesNode(legacy.data, { maxFloor: 2 }));
+});

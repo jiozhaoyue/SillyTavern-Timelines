@@ -89,18 +89,30 @@ export function matchesNode(nodeData, filterOptions = {}, parsedQuery = null) {
   }
 
   // 4. 重试 Swipes 筛选
+  // 真实图谱节点：父节点带 totalSwipes 统计，swipe 变体节点带 isSwipe/swipeId；
+  // swipes 数组与 swipe_id 仅作为旧数据形状的兜底。
   if (filterOptions.onlySwipes) {
+    const isSwipeNode = Boolean(nodeData.isSwipe);
     let swipeCount = 0;
     if (Array.isArray(nodeData.swipes)) {
       swipeCount = nodeData.swipes.length;
+    } else if (nodeData.totalSwipes != null) {
+      swipeCount = Number(nodeData.totalSwipes) || 0;
     } else if (nodeData.swipe_id != null && Number(nodeData.swipe_id) >= 0) {
       swipeCount = Number(nodeData.swipe_id) + 1;
     }
-    if (swipeCount <= 1) return false;
+    if (!isSwipeNode && swipeCount <= 1) return false;
   }
 
-  // 5. 楼层/深度范围
-  const floor = nodeData.depth != null ? Number(nodeData.depth) : (nodeData.floor != null ? Number(nodeData.floor) : 0);
+  // 5. 楼层/深度范围（真实图谱节点的楼层字段是 chat_depth）
+  const floor =
+    nodeData.depth != null
+      ? Number(nodeData.depth)
+      : nodeData.chat_depth != null
+        ? Number(nodeData.chat_depth)
+        : nodeData.floor != null
+          ? Number(nodeData.floor)
+          : 0;
   if (filterOptions.minFloor != null && filterOptions.minFloor !== '' && floor < Number(filterOptions.minFloor)) {
     return false;
   }
