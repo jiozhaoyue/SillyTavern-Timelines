@@ -801,18 +801,53 @@ function makeTapTippy(ele) {
       let formattedMsg;
       if (ele.data('msg')) {
         mesDiv.classList.add('mes_text');
-        formattedMsg = formatNodeMessage(ele.data('msg'));
-        formattedMsg = highlightTextSearchMatches(formattedMsg);
-        // 细腰图模式：提示全文已截断（完整内容可在会话楼层查看）
+        const previewHtml = highlightTextSearchMatches(formatNodeMessage(ele.data('msg')));
+        const msgBody = document.createElement('div');
+        msgBody.innerHTML = previewHtml;
+        mesDiv.appendChild(msgBody);
+        // 细腰图模式：就地展开全文（经 IndexedDB 缓存解析原始消息，swipe 节点还原对应变体）
         if (ele.data('msgTruncated')) {
-          formattedMsg += `<div style="margin-top:6px;font-size:0.8em;opacity:0.65">ℹ️ 省内存模式下仅展示预览，完整内容请跳转对应会话楼层查看。</div>`;
+          const previewText = String(ele.data('msg') ?? '');
+          const expandBtn = document.createElement('button');
+          expandBtn.classList.add('menu_button');
+          expandBtn.style.marginTop = '6px';
+          expandBtn.style.fontSize = '0.85em';
+          expandBtn.textContent = '📄 展开全文';
+          expandBtn.addEventListener('click', async () => {
+            if (mesDiv.dataset.expanded === '1') {
+              mesDiv.dataset.expanded = '0';
+              msgBody.innerHTML = previewHtml;
+              expandBtn.textContent = '📄 展开全文';
+              return;
+            }
+            expandBtn.disabled = true;
+            expandBtn.textContent = '⏳ 正在加载全文…';
+            try {
+              const fullText = await getFullNodeText(ele.data());
+              if (typeof fullText === 'string' && fullText && fullText !== previewText) {
+                mesDiv.dataset.expanded = '1';
+                msgBody.innerHTML = highlightTextSearchMatches(formatNodeMessage(fullText));
+                expandBtn.textContent = '📕 收起，仅显示预览';
+              } else {
+                expandBtn.textContent = 'ℹ️ 暂无法获取全文，请跳转会话楼层查看';
+              }
+            } catch (err) {
+              console.warn('Timelines: 展开节点全文失败：', err);
+              expandBtn.textContent = '⚠️ 全文加载失败，请跳转会话楼层查看';
+            } finally {
+              expandBtn.disabled = false;
+            }
+          });
+          mesDiv.appendChild(expandBtn);
         }
       } else if (ele.data('id') === 'root') {
         // 根节点没有消息，只有 AI 角色名，因此不应使用 `mes_text` class。
         // 这样可让根节点的 Tippy 与 TapTippy 布局一致。
         formattedMsg = `<small><i>此节点代表这组时间线中的 AI 角色${String(ele.data('name') ?? '').includes(', ') ? '们' : ''}。</i></small>`;
       }
-      mesDiv.innerHTML = formattedMsg;
+      if (!ele.data('msg')) {
+        mesDiv.innerHTML = formattedMsg;
+      }
       div.appendChild(mesDiv);
 
       // 遍历所有已注册的微内核节点修饰器，渲染扩展卡片区域 (如 原生标签、记忆图谱等)

@@ -1,6 +1,7 @@
 import { characters, getRequestHeaders } from '../../../../../script.js';
 import { getContext } from '../../../../extensions.js';
 import { timelinesCache } from './cache.js';
+import { resolveFullTextFromCache } from './node-text.js';
 import {
   buildGraph,
   convertToCytoscapeElements,
@@ -352,7 +353,8 @@ export async function prepareData(data, isGroupChat, forceReload = false) {
  * 解析节点的全文文本（细腰图按需取）。
  *
  * 省内存模式下节点 msg 为截断预览；此函数经 chat_sessions 定位到 (会话, 楼层)，
- * 从 IndexedDB 缓存解析原始消息返回全文。未截断节点直接返回 msg。
+ * 从 IndexedDB 缓存解析原始消息返回全文（swipe 节点解析对应 swipes 变体）。
+ * 未截断节点直接返回 msg。
  *
  * @param {Object} nodeData - 图谱节点数据（含 chat_sessions / msgTruncated）。
  * @returns {Promise<string>} 全文文本（解析失败时回退为节点预览）。
@@ -367,7 +369,7 @@ export async function getFullNodeText(nodeData) {
   if (entries.length === 0) {
     return preview;
   }
-  const [fileName, session] = entries[0];
+  const [fileName] = entries[0];
   const context = getTimelinesContext();
   const scopeKey = !context?.characterId
     ? `group_${context?.groupId || 'unknown'}`
@@ -375,9 +377,8 @@ export async function getFullNodeText(nodeData) {
   try {
     const cached = await timelinesCache.getChat(scopeKey, fileName);
     const messages = Array.isArray(cached?.messages) ? cached.messages : [];
-    const index = Number(session?.indexInGroup ?? session?.messageId ?? -1);
-    const text = messages[index]?.mes;
-    return typeof text === 'string' && text ? text : preview;
+    const resolved = resolveFullTextFromCache(nodeData, messages);
+    return typeof resolved === 'string' && resolved ? resolved : preview;
   } catch {
     return preview;
   }
