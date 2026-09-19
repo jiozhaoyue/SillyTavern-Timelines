@@ -2078,6 +2078,11 @@ async function updateTimelineDataIfNeeded(forceReload = false, hooks = {}) {
   const context = getTimelinesContext();
   const contextKey = makeContextKey(context);
   if (forceReload || lastContextKey !== contextKey) {
+    if (lastContextKey !== contextKey) {
+      // 切换角色/群组后节点 id 与 clusterId 按新数据重建，
+      // 旧上下文的手动 LOD 展开集合不再适用，避免跨角色状态残留
+      expandedClusterIds.clear();
+    }
     let data = {};
     const isGroupChat = !context.characterId;
     const onBatch = typeof hooks.onBatch === 'function' ? hooks.onBatch : null;
