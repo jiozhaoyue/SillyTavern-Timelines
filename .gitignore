@@ -1,0 +1,13 @@
+# 本地 AI 工具运行产物（不应随插件分发）
+.history/
+.codex/
+.claude/
+.cursor/
+
+# 端到端自动化验证截图
+luker_timelines_*.png
+
+# Node / Python 运行时产物
+node_modules/
+**/__pycache__/
+*.pyc

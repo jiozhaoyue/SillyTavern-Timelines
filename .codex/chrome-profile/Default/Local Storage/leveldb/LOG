@@ -1,8 +1,0 @@
-2026/06/07-13:20:12.837 8444 Creating DB D:\VScode-repo\Github\Public\Public-MyRepo\ST-user-message-swipe\.codex\chrome-profile\Default\Local Storage\leveldb since it was missing.
-2026/06/07-13:20:12.854 8444 Reusing MANIFEST D:\VScode-repo\Github\Public\Public-MyRepo\ST-user-message-swipe\.codex\chrome-profile\Default\Local Storage\leveldb/MANIFEST-000001
-2026/06/07-13:29:30.637 a344 Level-0 table #5: started
-2026/06/07-13:29:30.646 a344 Level-0 table #5: 377764 bytes OK
-2026/06/07-13:29:30.648 a344 Delete type=0 #3
-2026/06/07-13:29:40.035 a344 Level-0 table #7: started
-2026/06/07-13:29:40.040 a344 Level-0 table #7: 376701 bytes OK
-2026/06/07-13:29:40.041 a344 Delete type=0 #4
