@@ -302,10 +302,12 @@ let isTapTippyVisible = false; // 完整信息面板是否可见
 
 /*
  * 关闭节点完整信息面板。
+ * hide 后必须 destroy：面板 popper 挂载在 document.body，只 hide 会永久残留。
  */
 function closeTapTippy() {
   if (activeTapTippy) {
     activeTapTippy.hide();
+    activeTapTippy.destroy();
     activeTapTippy = null;
     isTapTippyVisible = false;
     currentlyOpenNode = null;
@@ -521,6 +523,22 @@ function truncateTooltipMessage(msg, length = 100) {
 }
 
 const hoverTooltipFormatCache = new WeakMap(); // cy 节点 -> { msg, html }，避免每次悬停重跑 Markdown 转换
+
+/**
+ * 隐藏并销毁存储在图元素上的 tippy 实例。
+ *
+ * 必须销毁而非仅 hide：tippy 的 popper 以 appendTo: document.body 挂载，
+ * 只 hide 会让隐藏 popper 永久残留在 body 中（悬停/点按越多久积越多）。
+ *
+ * @param {Object} ele - 持有 `_tippy` 引用的 Cytoscape 元素。
+ */
+function destroyElementTippy(ele) {
+  if (ele._tippy) {
+    ele._tippy.hide();
+    ele._tippy.destroy();
+    ele._tippy = null;
+  }
+}
 
 /**
  * 取得节点 hover tooltip 的格式化消息 HTML。
@@ -1716,6 +1734,7 @@ function setupEventHandlers(cy, nodeData) {
 
     if (edge._tippy) {
       edge._tippy.hide();
+      edge._tippy.destroy();
       edge._tippy = null;
     }
   });
@@ -1762,8 +1781,9 @@ function setupEventHandlers(cy, nodeData) {
       return;
     }
     if (node._tippy) {
-      // Hide tooltip if it is open
+      // Hide and destroy the hover tooltip if it is open
       node._tippy.hide();
+      node._tippy.destroy();
       node._tippy = null;
     }
     const thisNodeWasOpen = node === currentlyOpenNode;
@@ -1876,6 +1896,7 @@ function setupEventHandlers(cy, nodeData) {
 
     if (node._tippy) {
       node._tippy.hide();
+      node._tippy.destroy();
       node._tippy = null;
     }
   });
@@ -1923,6 +1944,9 @@ function renderCytoscapeDiagram(nodeData, customLayout = null) {
     searchRadarInstance = null;
   }
   if (theCy) {
+    // 先销毁挂在图元素上的 tippy（popper 挂载在 body，随图销毁不会自动清理）
+    theCy.elements().forEach(destroyElementTippy);
+    closeTapTippy();
     theCy.destroy();
     theCy = null;
   }
