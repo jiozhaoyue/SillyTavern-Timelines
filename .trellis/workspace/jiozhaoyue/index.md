@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 19
+- **Total Sessions**: 20
 - **Last Active**: 2026-09-25
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~698 | Active |
+| `journal-1.md` | ~735 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 20 | 2026-09-25 | Authority 后端插件集成考虑：能力面全景与分期路线（设计任务） | `30411c1` | `codex-luker-chinese-refactor` |
 | 19 | 2026-09-25 | Authority 集成对齐审计与最小权限修正（L4 任务闭环） | `a75bbd3` | `codex-luker-chinese-refactor` |
 | 18 | 2026-09-19 | 行为审计修复轮：tooltip 泄漏/字段错位/全文消费链贯通 | `5084206`, `4e98cb9`, `1267ffd`, `57cb0d9`, `064f281` | `codex-luker-chinese-refactor` |
 | 17 | 2026-09-19 | 复制消息全文——右键菜单与详情面板剪贴板支持 | `d6714e4` | `codex-luker-chinese-refactor` |

@@ -696,3 +696,40 @@ tooltip DOM 泄漏与 hover 缓存、LOD 跨角色残留、三处字段错位（
 ### Status
 
 [OK] **Completed**
+
+
+## Session 20: Authority 后端插件集成考虑：能力面全景与分期路线（设计任务）
+<!-- trellis-session: v=2 fp=c1f74d3284c7b6d4 -->
+
+**Date**: 2026-09-25
+**Task**: Authority 后端插件集成考虑：能力面全景与分期路线（设计任务）
+**Branch**: `codex-luker-chinese-refactor`
+
+### Summary
+
+补全与后端插件 ST-Delegation-of-authority（jiozhaoyue fork）结合的完整设计考虑：盘点 SDK 公开能力面（8 资源 + transfers/permissions/probe/modules/agent）与 Timelines 已落地面及四项局限；提出 A/B/C/D 四组候选方向与七条不做清单；给出 Phase 0 实机 E2E → Phase 1 零新权限检索深化的推荐路线；设计任务 09-25-authority-integration-design 落盘 prd+design，待用户裁定分期后另立实施任务
+
+### Main Changes
+
+- 核验 Authority 仓 client.ts 全部能力命名空间（storage.kv/blob、fs.private、sql、trivium、http.fetch、jobs、events、transfers、permissions、probe/hasFeature、modules、agent）并沉淀能力面全景表
+- 盘点 Timelines 已落地集成面（适配层/索引/检索/embedding/设置接线）与四项局限（索引纯手动、embedding 依赖宿主端点、检索限单角色、neighbors 与 payload 筛选未用）
+- 候选方向：A 零新权限深化（neighbors 上下文/雷达筛选/跨角色检索/统计物化/自动增量）、B http.fetch embedding 代理、C blob 导出留存、D jobs/events 暂不启用；不做清单七条（agent、modules、Host Bridge、事实源违规、mapping 热路径、jobs 滥用、trivium 当 embedding）
+- 分期路线：Phase 0 实机 E2E（8003+Authority，Session 19 遗留）→ Phase 1 零新权限四件套 → Phase 2/3 可选（各 +1 权限）；开放问题四项待用户裁定
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `30411c1` | docs(design): Authority 后端插件集成考虑——能力面全景、候选方向与分期路线（09-25-authority-integration-design） |
+
+### Testing
+
+- [OK] git status --short 证实未改动产品代码；design.md 全部结论带 file:line 证据（本仓 src + Authority 仓 client.ts / capabilities-and-isolation.md）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 用户裁定分期路线与开放问题后，另立实施任务（回填实施 PRD 后 task.py start）
