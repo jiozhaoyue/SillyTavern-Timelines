@@ -229,6 +229,10 @@ async function main() {
     await screenshot(cdp, 'phase0_01_adapter_ready');
 
     // ---- 步骤 1.5：打开一个有会话的角色（新浏览器档案无加载中的会话，时间树为空） ----
+    // 宿主 API 语义（Luker 2.7.0 public/script.js openCharacterChat）：该函数参数是【聊天文件名】，
+    // 且只对【当前已选中角色】生效——this_chid === undefined（欢迎屏态）时静默 return。
+    // 从零加载会话的正确入口是 selectCharacterById(角色索引)：选中角色并 getChat() 加载其当前聊天。
+    // 此前传角色索引调用 openCharacterChat 属潜伏 bug：实例 auto_load_chat 生效时走 already 快捷路径被掩盖。
     const chatOpened = await cdpEvaluate(cdp, `(async () => {
       const ctx = window.Luker?.getContext?.() ?? window.SillyTavern?.getContext?.();
       if (!ctx) return { error: 'no-context' };
@@ -237,14 +241,14 @@ async function main() {
         .map((c, i) => ({ i, name: c?.name ?? '', chat: c?.chat ?? null }))
         .filter(c => c.chat);
       if (!candidates.length) return { error: 'no-character-with-chat' };
-      if (typeof ctx.openCharacterChat !== 'function') return { error: 'no-openCharacterChat' };
+      if (typeof ctx.selectCharacterById !== 'function') return { error: 'no-selectCharacterById' };
       // 逐个尝试（最多 4 个）：个别角色的当前聊天可能处于异常状态
       const tried = [];
       for (const pick of candidates.slice(0, 4)) {
-        try { await ctx.openCharacterChat(pick.i); } catch (err) { tried.push(pick.name + ': ' + String(err?.message ?? err).slice(0, 40)); continue; }
+        try { await ctx.selectCharacterById(pick.i); } catch (err) { tried.push(pick.name + ': ' + String(err?.message ?? err).slice(0, 40)); continue; }
         for (let i = 0; i < 8; i++) {
           await new Promise(r => setTimeout(r, 1000));
-          if (ctx.chatId != null) return { opened: pick.name, chatId: ctx.chatId };
+          if (ctx.chatId != null && ctx.characterId != null) return { opened: pick.name, chatId: ctx.chatId };
         }
         tried.push(pick.name + ': chatId 未就绪');
       }
@@ -254,7 +258,7 @@ async function main() {
       const ctx = window.Luker?.getContext?.() ?? window.SillyTavern?.getContext?.();
       return !!(ctx && ctx.chatId != null);
     })()`, { timeoutMs: 30000, intervalMs: 1000, label: '角色会话加载' }).catch(() => null);
-    record('打开角色会话（宿主 openCharacterChat）', !chatOpened?.error, JSON.stringify(chatOpened));
+    record('打开角色会话（宿主 selectCharacterById）', !chatOpened?.error, JSON.stringify(chatOpened));
 
     // ---- 步骤 2：打开时间树，等待图谱拓扑就绪 ----
     await cdpEvaluate(cdp, `window.jQuery('#show_timeline_view').trigger('click');`, false);
@@ -352,6 +356,108 @@ async function main() {
     record('跨会话结果弹窗渲染（formatGlobalResults + openSemanticGlobalModal）', modalShown?.rows === 1 && modalVisible, `rows=${modalShown?.rows} visible=${modalVisible}`);
     await screenshot(cdp, 'phase0_04_global_modal');
     await cdpEvaluate(cdp, `import(${JSON.stringify(EXT_BASE + '/src/semantic-global-modal.js')}).then(m => m.closeSemanticGlobalModal());`);
+
+    // ---- 步骤 9：A4 自动增量索引调度实机（Session 22 遗留补验项） ----
+    // 挂点 = 时间树数据确有更新（dataUpdated）后 fire-and-forget maybeAutoSemanticIndex。
+    // 可观测信号：静默构建失败 → console.warn '[Timelines] 自动语义索引构建失败（60s 冷却后重试）'；
+    // 成功 → console.info '[Timelines] 自动语义索引完成'。两种路径都零 toast（静默模式铁律）。
+    // 本实例 embedding 端点已被 Luker 移除（404），预期走失败路径。
+    await cdpEvaluate(cdp, `(() => {
+      window.__autoSignals = [];
+      for (const kind of ['warn', 'info']) {
+        const orig = console[kind].bind(console);
+        console[kind] = (...a) => { const t = a.map(String).join(' '); if (t.includes('自动语义索引')) window.__autoSignals.push({ kind, text: t.slice(0, 160) }); orig(...a); };
+      }
+      return 'auto-signal-hooked';
+    })()`, false);
+    await cdpEvaluate(cdp, `window.jQuery('#tl_semantic_auto_index').prop('checked', true).trigger('input');`, false);
+    // 触发数据更新：切换到下一个有会话的候选角色，再点一次时间线按钮驱动渐进管线
+    // （CHAT_CHANGED 只清 lastContextKey，不自动重载；onTimelineButtonClick 才会跑管线并触发 A4 挂点）
+    const autoResult = await cdpEvaluate(cdp, `(async () => {
+      const ctx = window.Luker?.getContext?.() ?? window.SillyTavern?.getContext?.();
+      const cur = ctx.characterId;
+      const toastsBefore = (window.__e2eToasts ?? []).length;
+      const candidates = (ctx.characters ?? []).map((c, i) => ({ i, chat: c?.chat ?? null })).filter(c => c.chat && String(c.i) !== String(cur));
+      if (!candidates.length) return { error: 'no-second-candidate' };
+      for (const pick of candidates.slice(0, 3)) {
+        try { await ctx.selectCharacterById(pick.i); } catch { continue; }
+        let loaded = false;
+        for (let i = 0; i < 15; i++) { await new Promise(r => setTimeout(r, 1000)); if (ctx.chatId != null && String(ctx.characterId) === String(pick.i)) { loaded = true; break; } }
+        if (!loaded) continue;
+        window.jQuery('#show_timeline_view').trigger('click');
+        let treeCount = 0;
+        for (let i = 0; i < 25; i++) { await new Promise(r => setTimeout(r, 1000)); treeCount = window.TimelinesExtensionApi?.getTimelineTree?.().length ?? 0; if (treeCount > 0) break; }
+        if (!treeCount) continue; // 空会话树不构成 A4 触发条件，换下一个候选
+        // 等自动构建尝试完成（embedding 404 为快速失败）
+        for (let i = 0; i < 15; i++) {
+          await new Promise(r => setTimeout(r, 1000));
+          if (window.__autoSignals.length) break;
+        }
+        if (window.__autoSignals.length) return { triggeredBy: pick.name ?? String(pick.i), charId: pick.i, chatId: ctx.chatId, treeCount, signals: window.__autoSignals, semanticToasts: (window.__e2eToasts ?? []).slice(toastsBefore).filter(t => /语义/.test(t.text ?? '')) };
+      }
+      return { error: 'auto-signal-not-seen', signals: window.__autoSignals };
+    })()`);
+    const autoOk = Array.isArray(autoResult?.signals) && autoResult.signals.length > 0;
+    const autoSilentOk = (autoResult?.semanticToasts ?? []).length === 0;
+    record('A4 自动增量索引调度（数据更新→静默构建→冷却信号，零 toast）', autoOk && autoSilentOk,
+      `triggeredBy=${autoResult?.triggeredBy ?? '-'} signals=${JSON.stringify(autoResult?.signals ?? autoResult)} silentNoToast=${autoSilentOk}`);
+
+    // ---- 步骤 10：Phase 3 导出服务端留存 UI 全链路（Session 22 遗留补验项） ----
+    // 开留存放关 → 导出弹窗下载 → blob 留存 toast → 历史画廊回看 → 下载 → 删除（CRUD 收口并清理测试产物）。
+    // 新增卡片判定：导出前先开一次画廊取基线 id 快照，导出后取差集——不依赖角色名（角色可能在步骤 9 被切换）。
+    await cdpEvaluate(cdp, `window.jQuery('#tl_export_server_keep').prop('checked', true).trigger('input');`, false);
+    const baselineIds = await cdpEvaluate(cdp, `(async () => {
+      window.jQuery('#tl_export_history_btn').trigger('click');
+      for (let i = 0; i < 10; i++) { await new Promise(r => setTimeout(r, 1000)); if (document.querySelector('.export-history-card, .export-history-empty')) break; }
+      const ids = [...document.querySelectorAll('.export-history-card')].map(c => c.dataset.id);
+      document.querySelector('.timelines-export-history-modal .export-history-close-btn')?.click();
+      await new Promise(r => setTimeout(r, 500));
+      return ids;
+    })()`);
+    await cdpEvaluate(cdp, `document.querySelector('.export-timeline-btn')?.click();`, false);
+    await sleep(1200);
+    const exportChain = await cdpEvaluate(cdp, `(async () => {
+      const ctx = window.Luker?.getContext?.() ?? window.SillyTavern?.getContext?.();
+      const exportLabel = ctx?.characters?.[ctx.characterId]?.name ?? String(ctx?.characterId);
+      const dlBtn = document.querySelector('.timelines-export-modal .tl-btn-download') || document.querySelector('.tl-btn-download');
+      if (!dlBtn) return { error: 'no-download-btn' };
+      const toastsBefore = (window.__e2eToasts ?? []).length;
+      dlBtn.click();
+      let kept = false;
+      for (let i = 0; i < 20; i++) {
+        await new Promise(r => setTimeout(r, 1000));
+        kept = (window.__e2eToasts ?? []).slice(toastsBefore).some(t => /已留存到服务端导出历史/.test(t.text ?? ''));
+        if (kept) break;
+      }
+      return { exportLabel, keptToast: kept, newToasts: (window.__e2eToasts ?? []).slice(toastsBefore).map(t => t.kind + ':' + String(t.text).slice(0, 60)) };
+    })()`);
+    // 历史画廊：打开 → 找本次新增卡片 → 下载 → 删除
+    const gallery = await cdpEvaluate(cdp, `(async () => {
+      window.jQuery('#tl_export_history_btn').trigger('click');
+      const modal = document.querySelector('.timelines-export-history-modal');
+      if (!modal) return { error: 'no-history-modal' };
+      for (let i = 0; i < 10; i++) { await new Promise(r => setTimeout(r, 1000)); if (modal.querySelector('.export-history-card, .export-history-empty')) break; }
+      const baseline = ${JSON.stringify(baselineIds ?? [])};
+      const cards = [...modal.querySelectorAll('.export-history-card')];
+      const cardNames = cards.map(c => c.querySelector('.export-history-name')?.textContent ?? '');
+      const card = cards.find(c => !baseline.includes(c.dataset.id));
+      if (!card) return { error: 'new-card-not-found', cardNames };
+      const toastsBefore = (window.__e2eToasts ?? []).length;
+      card.querySelector('.export-history-dl-btn')?.click();
+      let dlOk = false;
+      for (let i = 0; i < 15; i++) { await new Promise(r => setTimeout(r, 1000)); dlOk = (window.__e2eToasts ?? []).slice(toastsBefore).some(t => /已从服务端下载导出物/.test(t.text ?? '')); if (dlOk) break; }
+      const refreshed = [...modal.querySelectorAll('.export-history-card')].find(c => c.dataset.id === card.dataset.id);
+      if (!refreshed) return { error: 'card-gone-before-delete', cardNames };
+      refreshed.querySelector('.export-history-del-btn')?.click();
+      let delOk = false;
+      for (let i = 0; i < 15; i++) { await new Promise(r => setTimeout(r, 1000)); delOk = (window.__e2eToasts ?? []).slice(toastsBefore).some(t => /已从服务端删除/.test(t.text ?? '')); if (delOk) break; }
+      return { cardNames, downloadOk: dlOk, deleteOk: delOk };
+    })()`);
+    const exportOk = exportChain?.keptToast === true && gallery?.downloadOk === true && gallery?.deleteOk === true;
+    record('Phase 3 导出服务端留存 UI 全链路（留存→画廊→下载→删除）', exportOk,
+      `keep=${exportChain?.keptToast} dl=${gallery?.downloadOk} del=${gallery?.deleteOk} label=${exportChain?.exportLabel} cards=${JSON.stringify(gallery?.cardNames ?? gallery).slice(0, 160)}`);
+    await screenshot(cdp, 'phase0_05_export_history');
+    await cdpEvaluate(cdp, `document.querySelector('.timelines-export-history-modal .export-history-close-btn')?.click();`, false);
 
     // ---- 汇总 ----
     const summary = { baseUrl: BASE_URL, at: new Date().toISOString(), results };
