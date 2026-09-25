@@ -10,7 +10,6 @@
  */
 
 import { decodeExternalId } from './semantic-index-service.js';
-import { hashText } from './embedding-provider.js';
 
 /** 语义检索默认召回数 */
 export const SEMANTIC_TOP_K = 30;
@@ -98,16 +97,6 @@ export function formatGlobalResults(hits) {
 
   rows.sort((a, b) => b.score - a.score);
   return rows;
-}
-
-/**
- * 构建查询文本缓存键（查询向量化去重，短会话内重复查询零开销）。
- *
- * @param {string} queryText
- * @returns {string}
- */
-export function makeQueryCacheKey(queryText) {
-  return hashText(String(queryText ?? ''));
 }
 
 /**
