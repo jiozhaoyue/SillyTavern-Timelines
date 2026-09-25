@@ -657,3 +657,38 @@ export function aggregateIndexStateByNamespace(rows) {
     }))
     .sort((a, b) => b.count - a.count || a.namespace.localeCompare(b.namespace));
 }
+
+/**
+ * 自动增量索引节流状态机（A4，纯逻辑可注入时钟）。
+ *
+ * 单例使用（L1-MF-12：状态收敛于状态机，禁止散落布尔）：
+ * - `attempt()`：'run'（放行并占用）| 'skip-busy'（上一次仍在进行）| 'skip-cooldown'（失败冷却期内）。
+ * - `settle(ok)`：成功清冷却；失败设 `cooldownMs`（默认 60s）失败冷却，杜绝无界重试风暴。
+ * - `reset()`：仅测试使用。
+ *
+ * @param {object} [options]
+ * @param {number} [options.cooldownMs=60000]
+ * @param {Function} [options.now] - 时钟注入（默认 Date.now）。
+ * @returns {{attempt: Function, settle: Function, reset: Function}}
+ */
+export function createAutoIndexThrottle({ cooldownMs = 60_000, now = () => Date.now() } = {}) {
+  let running = false;
+  let cooldownUntil = 0;
+
+  return {
+    attempt() {
+      if (running) return 'skip-busy';
+      if (now() < cooldownUntil) return 'skip-cooldown';
+      running = true;
+      return 'run';
+    },
+    settle(ok) {
+      running = false;
+      cooldownUntil = ok ? 0 : now() + cooldownMs;
+    },
+    reset() {
+      running = false;
+      cooldownUntil = 0;
+    },
+  };
+}

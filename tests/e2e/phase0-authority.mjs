@@ -149,7 +149,9 @@ async function main() {
     process.exit(4);
   }
   const debugPort = 9333; // 独立调试端口（不在 L0-16 保留段位）
-  const profileDir = join(ARTIFACTS_DIR, '.chrome-profile');
+  const profileDir = process.env.E2E_PROFILE
+    ? resolve(process.env.E2E_PROFILE)
+    : join(ARTIFACTS_DIR, '.chrome-profile');
   mkdirSync(profileDir, { recursive: true });
   const headful = process.env.E2E_HEADFUL === '1';
   const chromeArgs = [
@@ -235,15 +237,23 @@ async function main() {
         .map((c, i) => ({ i, name: c?.name ?? '', chat: c?.chat ?? null }))
         .filter(c => c.chat);
       if (!candidates.length) return { error: 'no-character-with-chat' };
-      const pick = candidates[0];
       if (typeof ctx.openCharacterChat !== 'function') return { error: 'no-openCharacterChat' };
-      await ctx.openCharacterChat(pick.i);
-      return { opened: pick.name };
+      // 逐个尝试（最多 4 个）：个别角色的当前聊天可能处于异常状态
+      const tried = [];
+      for (const pick of candidates.slice(0, 4)) {
+        try { await ctx.openCharacterChat(pick.i); } catch (err) { tried.push(pick.name + ': ' + String(err?.message ?? err).slice(0, 40)); continue; }
+        for (let i = 0; i < 8; i++) {
+          await new Promise(r => setTimeout(r, 1000));
+          if (ctx.chatId != null) return { opened: pick.name, chatId: ctx.chatId };
+        }
+        tried.push(pick.name + ': chatId 未就绪');
+      }
+      return { error: 'all-candidates-failed', tried };
     })()`);
     await pollOnPage(cdp, `(() => {
       const ctx = window.Luker?.getContext?.() ?? window.SillyTavern?.getContext?.();
       return !!(ctx && ctx.chatId != null);
-    })()`, { timeoutMs: 60000, intervalMs: 1000, label: '角色会话加载' });
+    })()`, { timeoutMs: 30000, intervalMs: 1000, label: '角色会话加载' }).catch(() => null);
     record('打开角色会话（宿主 openCharacterChat）', !chatOpened?.error, JSON.stringify(chatOpened));
 
     // ---- 步骤 2：打开时间树，等待图谱拓扑就绪 ----

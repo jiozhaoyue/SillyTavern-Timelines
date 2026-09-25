@@ -302,3 +302,26 @@ test('SemanticIndexer.build 删除条目必须携带 namespace（Phase 0 实机�
     assert.equal('namespaceLabel' in payload, false, '未传 label 时 payload 不携带该字段');
   }
 });
+
+test('createAutoIndexThrottle：run/busy/cooldown/settle 全路径（A4，可注入时钟）', async () => {
+  const { createAutoIndexThrottle } = await import('../src/semantic-index-service.js');
+  let t = 1000;
+  const throttle = createAutoIndexThrottle({ cooldownMs: 60_000, now: () => t });
+
+  assert.equal(throttle.attempt(), 'run');          // 空闲放行并占用
+  assert.equal(throttle.attempt(), 'skip-busy');    // 进行中跳过
+  throttle.settle(true);
+  assert.equal(throttle.attempt(), 'run');          // 成功后立即可再次执行（清冷却）
+  throttle.settle(false);                           // 失败 → 进入 60s 冷却
+  assert.equal(throttle.attempt(), 'skip-cooldown');
+  t += 59_999;
+  assert.equal(throttle.attempt(), 'skip-cooldown');
+  t += 1;
+  assert.equal(throttle.attempt(), 'run');          // 冷却期满放行
+  throttle.settle(true);
+  assert.equal(throttle.attempt(), 'run');
+  throttle.reset();
+  throttle.settle(false);
+  throttle.reset();
+  assert.equal(throttle.attempt(), 'run');          // reset 清冷却
+});

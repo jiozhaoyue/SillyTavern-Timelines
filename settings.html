@@ -384,6 +384,15 @@
           </div>
           <div class="timeline-view-settings_block flex-container">
             <label
+              for="tl_semantic_auto_index"
+              title="开启后，时间线数据发生更新（新消息/切会话等）时会自动增量构建语义索引（静默执行，失败后 60 秒冷却重试，不弹提示）。默认关闭（手动构建）。"
+              data-i18n="[title]开启后，时间线数据发生更新（新消息/切会话等）时会自动增量构建语义索引（静默执行，失败后 60 秒冷却重试，不弹提示）。默认关闭（手动构建）。"
+              >自动增量索引（数据更新后静默构建）</label
+            >
+            <input id="tl_semantic_auto_index" type="checkbox" />
+          </div>
+          <div class="timeline-view-settings_block flex-container">
+            <label
               for="tl_semantic_endpoint"
               title="向量化端点；默认使用 SillyTavern 原生 embedding 接口。更换 embedding 后端会改变向量维度并自动切换索引库。"
               data-i18n="[title]向量化端点；默认使用 SillyTavern 原生 embedding 接口。更换 embedding 后端会改变向量维度并自动切换索引库。"

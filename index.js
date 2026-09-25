@@ -97,7 +97,7 @@ import { initTagDecorator, TagsDrawer, openManageTagsModal } from './src/tag-man
 import { initMemoryGraphAdapter } from './src/adapters/memory-graph-adapter.js';
 import { initAuthorityAdapter, setAuthorityFeatureEnabled, getAuthorityStatus, getAuthorityClient } from './src/adapters/authority-adapter.js';
 import { createAuthorityHttpFetchAdapter } from './src/authority-http-fetch.js';
-import { getSemanticIndexStatus, runSemanticIndexBuild } from './src/semantic-index-service.js';
+import { getSemanticIndexStatus, runSemanticIndexBuild, createAutoIndexThrottle } from './src/semantic-index-service.js';
 import { createEmbeddingProvider } from './src/embedding-provider.js';
 import { detectDeviceProfile } from './src/memory-profile.js';
 import { createProgressState, mountProgressOverlay } from './src/load-progress.js';
@@ -161,6 +161,7 @@ let defaultSettings = {
   semanticAuthorityHttpFetch: false,
   semanticHttpModel: '',
   semanticHttpKey: '',
+  semanticAutoIndex: false,
   semanticEndpoint: '/api/embeddings/compute',
   semanticBatchSize: 8,
   memorySaverMode: 'auto',
@@ -247,6 +248,32 @@ function makeSemanticNamespaceLabel(context) {
 
 let semanticProviderInstance = null; // 语义检索 embedding 提供方单例（会话生命周期）
 
+// ---- A4：自动增量索引（默认关；节流状态机收敛生命周期，失败 60s 冷却） ----
+const autoIndexThrottle = createAutoIndexThrottle({ cooldownMs: 60_000 });
+let autoSemanticBuildRunner = null; // init 闭包注入的静默增量构建（依赖 triggerSemanticBuild 闭包态）
+
+/**
+ * 数据更新后的自动语义索引入口（fire-and-forget，不阻塞渲染管线）。
+ * 条件链：设置开 → 语义开 → Authority ready → 拓扑非空 → 节流放行。
+ */
+async function maybeAutoSemanticIndex() {
+  const settings = getTimelineSettings();
+  if (!settings.semanticAutoIndex) return;
+  if (!settings.semanticSearchEnabled) return;
+  if (getAuthorityStatus().status !== 'ready') return;
+  const elements = window.TimelinesExtensionApi?.getTimelineTree?.() ?? [];
+  if (!elements.length) return;
+  if (typeof autoSemanticBuildRunner !== 'function') return;
+  if (autoIndexThrottle.attempt() !== 'run') return;
+  try {
+    await autoSemanticBuildRunner();
+    autoIndexThrottle.settle(true);
+  } catch (err) {
+    autoIndexThrottle.settle(false);
+    console.warn('[Timelines] 自动语义索引异常（60s 冷却后重试）:', err);
+  }
+}
+
 /**
  * 取得（并按需创建）语义检索 embedding 提供方；设置中的端点/批次仅在首次创建时生效。
  *
@@ -317,6 +344,7 @@ async function loadSettings() {
     $('#tl_semantic_authority_fetch').prop('checked', settings.semanticAuthorityHttpFetch).trigger('input');
     $('#tl_semantic_http_model').val(settings.semanticHttpModel).trigger('input');
     $('#tl_semantic_http_key').val(settings.semanticHttpKey).trigger('input');
+    $('#tl_semantic_auto_index').prop('checked', settings.semanticAutoIndex).trigger('input');
     $('#tl_semantic_endpoint').val(settings.semanticEndpoint).trigger('input');
     $('#tl_semantic_batch_size').val(settings.semanticBatchSize).trigger('input');
     $('#tl_memory_saver_mode').val(settings.memorySaverMode).trigger('input');
@@ -2348,7 +2376,7 @@ async function onTimelineButtonClick(forceReload = false) {
 
   try {
     lastTimelineData = [];
-    await updateTimelineDataIfNeeded(forceReload, {
+    const dataUpdated = await updateTimelineDataIfNeeded(forceReload, {
       onBatch: (fileName, messages) => {
         progressiveDict[fileName] = messages;
         scheduleRebuild();
@@ -2367,6 +2395,10 @@ async function onTimelineButtonClick(forceReload = false) {
       await refreshDiagram(lastTimelineData, true);
     }
     progressState.done();
+    // A4：数据确有更新时自动触发语义索引增量构建（fire-and-forget，不阻塞 UI；失败 60s 冷却）
+    if (dataUpdated) {
+      maybeAutoSemanticIndex();
+    }
   } catch (err) {
     console.error('Timelines: 渐进加载失败，回退一次性渲染:', err);
     progressState.fail(err);
@@ -2490,6 +2522,7 @@ jQuery(async () => {
     tl_semantic_authority_fetch: 'semanticAuthorityHttpFetch',
     tl_semantic_http_model: 'semanticHttpModel',
     tl_semantic_http_key: 'semanticHttpKey',
+    tl_semantic_auto_index: 'semanticAutoIndex',
     tl_semantic_endpoint: 'semanticEndpoint',
     tl_semantic_batch_size: 'semanticBatchSize',
     tl_memory_saver_mode: 'memorySaverMode',
@@ -2626,19 +2659,19 @@ jQuery(async () => {
     }
   }
 
-  async function triggerSemanticBuild(forceRebuild) {
+  async function triggerSemanticBuild(forceRebuild, { silent = false } = {}) {
     const settings = getTimelineSettings();
     if (!settings.semanticSearchEnabled) {
-      toastr.warning('请先启用语义检索（并确认已安装 Authority 服务端插件）。');
+      if (!silent) toastr.warning('请先启用语义检索（并确认已安装 Authority 服务端插件）。');
       return;
     }
     const namespace = makeSemanticNamespace(getTimelinesContext());
     const elements = window.TimelinesExtensionApi?.getTimelineTree?.() ?? [];
     if (!elements.length) {
-      toastr.warning('当前时间树为空，没有可索引的节点。');
+      if (!silent) toastr.warning('当前时间树为空，没有可索引的节点。');
       return;
     }
-    toastr.info(forceRebuild ? '正在强制重建语义索引...' : '正在增量构建语义索引...');
+    if (!silent) toastr.info(forceRebuild ? '正在强制重建语义索引...' : '正在增量构建语义索引...');
     try {
       const result = await runSemanticIndexBuild({
         elements,
@@ -2652,16 +2685,30 @@ jQuery(async () => {
           $('#tl_semantic_status').text(`语义索引状态：${p.message ?? p.phase} (${p.done}/${p.total})`);
         },
       });
-      toastr.success(
-        `语义索引${forceRebuild ? '重建' : '构建'}完成：写入 ${result.upserted}、跳过 ${result.unchanged}、清理 ${result.deleted}、链接 ${result.links}`,
-      );
+      if (!silent) {
+        toastr.success(
+          `语义索引${forceRebuild ? '重建' : '构建'}完成：写入 ${result.upserted}、跳过 ${result.unchanged}、清理 ${result.deleted}、链接 ${result.links}`,
+        );
+      } else {
+        console.info(
+          `[Timelines] 自动语义索引完成：写入 ${result.upserted}、跳过 ${result.unchanged}、清理 ${result.deleted}`,
+        );
+      }
     } catch (err) {
-      console.error('[Timelines] 语义索引构建失败:', err);
-      toastr.error(`语义索引构建失败: ${err?.message ?? err}`);
+      // 静默模式（自动触发）绝不 toast 轰炸：console + 状态文本即可
+      if (silent) {
+        console.warn('[Timelines] 自动语义索引构建失败（60s 冷却后重试）:', err);
+        $('#tl_semantic_status').text(`语义索引状态：自动构建失败 (${err?.message ?? err})`);
+      } else {
+        console.error('[Timelines] 语义索引构建失败:', err);
+        toastr.error(`语义索引构建失败: ${err?.message ?? err}`);
+      }
     }
     updateSemanticStatusUI();
   }
 
+  // A4：注入静默增量构建（供模块级 maybeAutoSemanticIndex 调用）
+  autoSemanticBuildRunner = () => triggerSemanticBuild(false, { silent: true });
   $('#tl_semantic_build_btn').on('click', () => triggerSemanticBuild(false));
   $('#tl_semantic_rebuild_btn').on('click', () => triggerSemanticBuild(true));
 
