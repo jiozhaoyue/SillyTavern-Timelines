@@ -774,3 +774,44 @@ Phase 0 实机 E2E（Dev Luker 8003 + Authority，L1-MF-15 断言）8/8 全绿�
 ### Next Steps
 
 - Phase 2（http.fetch embedding 代理，已裁定纳入）另立实施任务；可选：neighbors 上下文 preview 文本的缓存管线
+
+
+## Session 22: Authority 集成清尾：Phase 2 出网代理 + A4 自动增量索引 + Phase 3 导出留存
+<!-- trellis-session: v=2 fp=f1094171d9742d89 -->
+
+**Date**: 2026-09-25
+**Task**: Authority 集成清尾：Phase 2 出网代理 + A4 自动增量索引 + Phase 3 导出留存
+**Branch**: `codex-luker-chinese-refactor`
+
+### Summary
+
+把用户裁定的三项剩余任务全部实施闭环：Phase 2 embedding 服务端出网代理（+http.fetch 授权项，绕 CORS，环回被 SSRF 规则硬封锁、外网被管理员策略封锁——治理模型预期，放行为管理员操作）；A4 自动增量索引（默认关，节流状态机 60s 失败冷却，静默零 toast，顺带修复闭包不可见导致的渐进管线 ReferenceError）；Phase 3 导出服务端留存（+storage.blob 授权项，tl-export/ 前缀，导出历史画廊支持回看/下载/删除，实测 blob.list 直返数组与 SDK 类型标注不符）。147/147 单测绿，blob 数据面与适配器授权层实机取证通过；实机会话打开失效（宿主层）导致导出/索引 UI 全链路为环境恢复后补验项
+
+### Main Changes
+
+- Phase 2：src/authority-http-fetch.js 适配器（fetch→client.http.fetch 翻译 + Response-like）；provider 增 model/input 双兼容字段 + Bearer 头 + transportResolver（首次解析缓存，失败计入熔断）；设置三项（通道开关默认关/模型名/密钥 password 型）
+- A4：createAutoIndexThrottle（run/skip-busy/skip-cooldown，可注入时钟）；triggerSemanticBuild 静默分支；挂点 = 时间树数据确有更新后 fire-and-forget；设置 semanticAutoIndex 默认关
+- Phase 3：src/export-history-service.js（命名/解析/base64/CRUD/留存编排）+ src/export-history-modal.js 画廊 + export-modal 留存钩子 + 设置区服务端导出留存
+- 权限面演进：{trivium.private, sql.private} → +http.fetch（Phase 2）→ +storage.blob（Phase 3，不声明 kv）；负断言测试同步演进
+- spec §4.3 补 http.fetch 授权模型与环回封锁；WIKI 4.13/README 同步三项特性
+- 环境事实：实例 openCharacterChat 全角色静默失效（宿主层，全新 profile 复现；此前多轮成功）→ 导出/索引 UI 全链路实机补验待环境恢复；blob/Trivium/SQL 数据面不受影响
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `db4cd0f` | feat(semantic): Phase 2 embedding 服务端出网代理（Authority http.fetch） |
+| `b6803fa` | feat(semantic): A4 语义索引自动增量维护（默认关，节流冷却防风暴） |
+| `d2f7102` | feat(export): Phase 3 导出服务端留存（Authority storage.blob） |
+
+### Testing
+
+- [OK] node --test 147/147 全绿（Phase 2 +8、A4 +1、Phase 3 +4）；node --check 全过；Phase 0 E2E 门禁/适配层步骤复验通过；Phase 2 授权层取证与 Phase 3 blob 往返冒烟全绿（截图 phase2/phase3_smoke.png）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 环境恢复后补验：Phase 0 E2E 8/8 + A4 自动构建调度 + 导出留存 UI 全链路；多树视图（跨角色/群组同屏）为未裁定大特性候选待用户决策
