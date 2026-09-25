@@ -733,3 +733,44 @@ tooltip DOM 泄漏与 hover 缓存、LOD 跨角色残留、三处字段错位（
 ### Next Steps
 
 - 用户裁定分期路线与开放问题后，另立实施任务（回填实施 PRD 后 task.py start）
+
+
+## Session 21: Authority 集成 Phase 0 实机 E2E 与 Phase 1 零新权限检索深化
+<!-- trellis-session: v=2 fp=8f752809d020ceb1 -->
+
+**Date**: 2026-09-25
+**Task**: Authority 集成 Phase 0 实机 E2E 与 Phase 1 零新权限检索深化
+**Branch**: `codex-luker-chinese-refactor`
+
+### Summary
+
+Phase 0 实机 E2E（Dev Luker 8003 + Authority，L1-MF-15 断言）8/8 全绿：适配层 ready、Trivium/SQL 数据面往返、构建优雅降级、跨会话弹窗；实证 Authority 可移植子集在 Luker 可用，发现 Luker 已移除宿主 embedding 端点（坐实 Phase 2）。附带修复生产级 bulkDelete 静默漏删 bug。Phase 1 零新权限四件套落地：A2 语义复合筛选、A3 跨角色全局检索、D1 看板全库聚合、A1 neighbors 上下文芯片；134/134 单测绿，E2E 回归复验 8/8，实机冒烟通过
+
+### Main Changes
+
+- Phase 0 E2E 脚本 tests/e2e/phase0-authority.mjs（零依赖 CDP；BASE_URL 无默认值 + 端口白名单 {8001,8003,8899} 启动断言）
+- 生产级修复：semantic-index-service.js 两处 bulkDelete 条目补 namespace——Authority 按 (namespace, externalId) 解析映射，缺省落 default 报 not mapped 静默漏删，增量清理此前从未真正删除过 Trivium 节点
+- A2：buildSemanticPayloadFilter（服务端等值仅 namespace/bookmark，tags 实测不支持→filterHitsByPayload 客户端后过滤 + topK 放大）
+- A3：semanticSearch scope 参数 + 设置项 semanticGlobalScope（默认关）+ payload.namespaceLabel（makeSemanticNamespaceLabel 注入）+ 弹窗来源徽标/分组渲染
+- D1：getGlobalIndexStats/aggregateIndexStateByNamespace + 看板全库语义索引聚合区块（ready 渲染/无数据静默移除）
+- A1：fetchNeighborsForHits（方法存在性检测+try-catch 降级）/expandHitWithContexts + 弹窗相邻楼层身份芯片（点击穿越）；neighbors 响应无 payload，preview 留作后续
+- spec optional-integration.md 新增 §4 宿主可用性实证与运行时实测语义（自包含，含部署 junction 事实）；WIKI 4.13 / README 功能矩阵同步
+- 环境事实记录：实例扩展设置服务器持久化链路不落地（既有基线非回归）；#tl_semantic_enabled 双事件绑定（input 持久化/change 初始化）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9a90585` | feat(semantic): Authority 集成 Phase 0 实机 E2E 与 Phase 1 零新权限检索深化 |
+
+### Testing
+
+- [OK] node --test tests/*.test.mjs 134/134 全绿（基线 124+新增 10）；node --check 全部改动文件通过；Phase 0 E2E 8/8（含修复后回归复验）；实机 DOM 冒烟：雷达五组控件/语义按钮/全局徽章/新开关全部在位
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Phase 2（http.fetch embedding 代理，已裁定纳入）另立实施任务；可选：neighbors 上下文 preview 文本的缓存管线

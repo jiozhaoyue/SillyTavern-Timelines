@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 20
+- **Total Sessions**: 21
 - **Last Active**: 2026-09-25
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~735 | Active |
+| `journal-1.md` | ~776 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 21 | 2026-09-25 | Authority 集成 Phase 0 实机 E2E 与 Phase 1 零新权限检索深化 | `9a90585` | `codex-luker-chinese-refactor` |
 | 20 | 2026-09-25 | Authority 后端插件集成考虑：能力面全景与分期路线（设计任务） | `30411c1` | `codex-luker-chinese-refactor` |
 | 19 | 2026-09-25 | Authority 集成对齐审计与最小权限修正（L4 任务闭环） | `a75bbd3` | `codex-luker-chinese-refactor` |
 | 18 | 2026-09-19 | 行为审计修复轮：tooltip 泄漏/字段错位/全文消费链贯通 | `5084206`, `4e98cb9`, `1267ffd`, `57cb0d9`, `064f281` | `codex-luker-chinese-refactor` |
