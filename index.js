@@ -95,7 +95,8 @@ import {
 } from './src/api.js';
 import { initTagDecorator, TagsDrawer, openManageTagsModal } from './src/tag-manager.js';
 import { initMemoryGraphAdapter } from './src/adapters/memory-graph-adapter.js';
-import { initAuthorityAdapter, setAuthorityFeatureEnabled } from './src/adapters/authority-adapter.js';
+import { initAuthorityAdapter, setAuthorityFeatureEnabled, getAuthorityStatus, getAuthorityClient } from './src/adapters/authority-adapter.js';
+import { createAuthorityHttpFetchAdapter } from './src/authority-http-fetch.js';
 import { getSemanticIndexStatus, runSemanticIndexBuild } from './src/semantic-index-service.js';
 import { createEmbeddingProvider } from './src/embedding-provider.js';
 import { detectDeviceProfile } from './src/memory-profile.js';
@@ -157,6 +158,9 @@ let defaultSettings = {
   enableStyleLod: true,
   semanticSearchEnabled: false,
   semanticGlobalScope: false,
+  semanticAuthorityHttpFetch: false,
+  semanticHttpModel: '',
+  semanticHttpKey: '',
   semanticEndpoint: '/api/embeddings/compute',
   semanticBatchSize: 8,
   memorySaverMode: 'auto',
@@ -251,10 +255,20 @@ let semanticProviderInstance = null; // 语义检索 embedding 提供方单例�
 function getSemanticProvider() {
   if (!semanticProviderInstance) {
     const settings = getTimelineSettings();
+    const useAuthorityFetch = Boolean(settings.semanticAuthorityHttpFetch) && getAuthorityStatus().status === 'ready';
+    if (settings.semanticAuthorityHttpFetch && !useAuthorityFetch) {
+      toastr.warning('已开启「经 Authority 服务端出网」，但 Authority 未就绪，本次会话回退宿主通道。');
+    }
     semanticProviderInstance = createEmbeddingProvider({
       endpoint: settings.semanticEndpoint || '/api/embeddings/compute',
       batchSize: Number(settings.semanticBatchSize) || 8,
       getHeaders: () => getRequestHeaders(),
+      // Phase 2：服务端出网通道（按 hostname 授权 + 审计；密钥随请求头传出）
+      model: settings.semanticHttpModel || '',
+      apiKey: settings.semanticHttpKey || '',
+      transportResolver: useAuthorityFetch
+        ? async () => createAuthorityHttpFetchAdapter(await getAuthorityClient())
+        : null,
     });
   }
   return semanticProviderInstance;
@@ -300,6 +314,9 @@ async function loadSettings() {
     $('#tl_enable_style_lod').prop('checked', settings.enableStyleLod).trigger('input');
     $('#tl_semantic_enabled').prop('checked', settings.semanticSearchEnabled).trigger('input');
     $('#tl_semantic_global_scope').prop('checked', settings.semanticGlobalScope).trigger('input');
+    $('#tl_semantic_authority_fetch').prop('checked', settings.semanticAuthorityHttpFetch).trigger('input');
+    $('#tl_semantic_http_model').val(settings.semanticHttpModel).trigger('input');
+    $('#tl_semantic_http_key').val(settings.semanticHttpKey).trigger('input');
     $('#tl_semantic_endpoint').val(settings.semanticEndpoint).trigger('input');
     $('#tl_semantic_batch_size').val(settings.semanticBatchSize).trigger('input');
     $('#tl_memory_saver_mode').val(settings.memorySaverMode).trigger('input');
@@ -2470,6 +2487,9 @@ jQuery(async () => {
     tl_enable_style_lod: 'enableStyleLod',
     tl_semantic_enabled: 'semanticSearchEnabled',
     tl_semantic_global_scope: 'semanticGlobalScope',
+    tl_semantic_authority_fetch: 'semanticAuthorityHttpFetch',
+    tl_semantic_http_model: 'semanticHttpModel',
+    tl_semantic_http_key: 'semanticHttpKey',
     tl_semantic_endpoint: 'semanticEndpoint',
     tl_semantic_batch_size: 'semanticBatchSize',
     tl_memory_saver_mode: 'memorySaverMode',

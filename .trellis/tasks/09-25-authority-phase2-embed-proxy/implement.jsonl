@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/optional-integration.md", "reason": "集成范式 + §4 实测语义（http.fetch 形状/payloadFilter/宿主可用性）"}
+{"file": ".trellis/tasks/archive/2026-09/09-25-authority-integration-design/design.md", "reason": "上游设计：方向 B 边界与权限增量"}

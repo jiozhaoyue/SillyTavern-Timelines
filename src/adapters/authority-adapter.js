@@ -24,12 +24,15 @@ export const AUTHORITY_EXTENSION_ID = 'third-party/sillytavern-timelines';
  *   - client.trivium.*：bulkUpsert / bulkDelete / bulkLink / searchHybrid /
  *     indexText / createIndex / flush / stat（全部为 private 数据面）
  *   - client.sql.*：migrate / query / batch / exec（index_state 状态表）
- * 未使用的能力（storage.kv / jobs.background / fs / http / agent）一律不声明，
+ *   - client.http.fetch：embedding 服务端出网代理（Phase 2，按 hostname 运行时授权；
+ *     设置开关默认关，仅在用户启用服务端出网通道时实际调用）
+ * 未使用的能力（storage.kv / jobs.background / fs / agent）一律不声明，
  * 避免用户在 Security Center 授权弹窗看到多余风险项。
  */
 export const AUTHORITY_DECLARED_PERMISSIONS = {
   trivium: { private: true },
   sql: { private: true },
+  http: { fetch: true },
 };
 
 /** 合法状态集合 */

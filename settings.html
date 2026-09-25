@@ -357,6 +357,33 @@
           </div>
           <div class="timeline-view-settings_block flex-container">
             <label
+              for="tl_semantic_authority_fetch"
+              title="开启后向量化请求经 Authority 服务端出网（client.http.fetch，按 hostname 授权并纳入审计），可绕过浏览器 CORS。需已安装并授权 Authority。密钥仍由本插件设置随请求头传出，Authority 不保管密钥。"
+              data-i18n="[title]开启后向量化请求经 Authority 服务端出网（client.http.fetch，按 hostname 授权并纳入审计），可绕过浏览器 CORS。需已安装并授权 Authority。密钥仍由本插件设置随请求头传出，Authority 不保管密钥。"
+              >经 Authority 服务端出网（绕 CORS）</label
+            >
+            <input id="tl_semantic_authority_fetch" type="checkbox" />
+          </div>
+          <div class="timeline-view-settings_block flex-container">
+            <label
+              for="tl_semantic_http_model"
+              title="第三方 embedding 模型名（可选）。非空时请求体附带 model 与 input 字段（OpenAI 兼容格式），同时保留 text 字段兼容 ST 中转端。"
+              data-i18n="[title]第三方 embedding 模型名（可选）。非空时请求体附带 model 与 input 字段（OpenAI 兼容格式），同时保留 text 字段兼容 ST 中转端。"
+              >Embedding 模型名（可选）</label
+            >
+            <input id="tl_semantic_http_model" type="text" placeholder="text-embedding-3-small" />
+          </div>
+          <div class="timeline-view-settings_block flex-container">
+            <label
+              for="tl_semantic_http_key"
+              title="第三方 embedding API 密钥（可选）。非空时携带 Authorization: Bearer 头；密钥保存在宿主设置中并随请求头传出，Authority 不保管密钥。"
+              data-i18n="[title]第三方 embedding API 密钥（可选）。非空时携带 Authorization: Bearer 头；密钥保存在宿主设置中并随请求头传出，Authority 不保管密钥。"
+              >Embedding API 密钥（可选）</label
+            >
+            <input id="tl_semantic_http_key" type="password" placeholder="sk-..." autocomplete="off" />
+          </div>
+          <div class="timeline-view-settings_block flex-container">
+            <label
               for="tl_semantic_endpoint"
               title="向量化端点；默认使用 SillyTavern 原生 embedding 接口。更换 embedding 后端会改变向量维度并自动切换索引库。"
               data-i18n="[title]向量化端点；默认使用 SillyTavern 原生 embedding 接口。更换 embedding 后端会改变向量维度并自动切换索引库。"

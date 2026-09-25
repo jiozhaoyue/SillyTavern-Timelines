@@ -93,3 +93,69 @@ test('createEmbeddingProvider converts network-level errors into circuit failure
   const provider = createEmbeddingProvider({ batchSize: 1, fetchImpl });
   await assert.rejects(() => provider.embed(['a']), err => err instanceof EmbeddingUnavailableError && /网络请求失败/.test(err.message));
 });
+
+// ===================== Phase 2：服务端出网通道（model / apiKey / transportResolver） =====================
+
+test('model 非空时请求体携带 model 与 input 双兼容字段，apiKey 注入 Bearer 头', async () => {
+  const captured = {};
+  const provider = createEmbeddingProvider({
+    endpoint: 'https://api.example.com/v1/embeddings',
+    fetchImpl: async (url, init) => {
+      captured.url = url;
+      captured.headers = init.headers;
+      captured.body = JSON.parse(init.body);
+      return { ok: true, status: 200, json: async () => ({ embedding: [0.5, 0.6] }) };
+    },
+    model: 'text-embedding-3-small',
+    apiKey: 'sk-test',
+  });
+  await provider.embed(['你好']);
+  assert.equal(captured.url, 'https://api.example.com/v1/embeddings');
+  assert.equal(captured.body.model, 'text-embedding-3-small');
+  assert.deepEqual(captured.body.input, ['你好']);
+  assert.equal(captured.body.text, '你好', '保留 text 字段兼容 ST 中转端');
+  assert.equal(captured.headers.Authorization, 'Bearer sk-test');
+  assert.deepEqual(await provider.embed(['你好']), [[0.5, 0.6]], '缓存仍生效');
+});
+
+test('model/apiKey 缺省时请求体保持 {text} 且不带 Authorization（既有契约逐字节不变）', async () => {
+  const captured = {};
+  const provider = createEmbeddingProvider({
+    fetchImpl: async (url, init) => {
+      captured.headers = init.headers;
+      captured.body = JSON.parse(init.body);
+      return { ok: true, status: 200, json: async () => ({ embedding: [1] }) };
+    },
+  });
+  await provider.embed(['x']);
+  assert.deepEqual(captured.body, { text: 'x' });
+  assert.equal('Authorization' in captured.headers, false);
+});
+
+test('transportResolver 首次解析后缓存，解析失败计入熔断路径', async () => {
+  let resolveCalls = 0;
+  const transport = async (url, init) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ embedding: [0.1, 0.2, 0.3] }),
+  });
+  const provider = createEmbeddingProvider({
+    transportResolver: async () => {
+      resolveCalls += 1;
+      return transport;
+    },
+  });
+  await provider.embed(['a']);
+  await provider.embed(['b']);
+  assert.equal(resolveCalls, 1, 'resolver 只解析一次');
+
+  const failing = createEmbeddingProvider({
+    transportResolver: async () => {
+      throw new Error('Authority 未就绪');
+    },
+  });
+  await assert.rejects(
+    () => failing.embed(['a']),
+    err => err instanceof EmbeddingUnavailableError,
+  );
+});

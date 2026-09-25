@@ -97,6 +97,12 @@ Luker fork 的服务端**已移除 ST 上游的 embeddings 端点**：`src/endpo
 
 ### 4.3 Trivium 运行时实测语义（对齐矩阵之外的"形状陷阱"）
 
+0. **`http.fetch` 的授权模型与环回封锁**：请求 `{url, method, headers, body, bodyEncoding:'utf8'}`
+   → 响应 `{status, ok, headers, body, bodyEncoding, contentType}`（body 为字符串）。
+   **环回/实例自身地址被平台 SSRF 规则硬封锁**（`ensurePermission` 直接 reject）；其余 hostname 走
+   「管理员策略 > 用户 grant > 系统默认 granted」决策链——本 Dev 实例的管理员策略当前封锁全部出网，
+   放行为管理员操作。授权拒绝以 `AuthorityPermissionError` 抛出，调用方必须捕获并降级
+   （Timelines 侧包装为 `EmbeddingUnavailableError` 熔断，见 `src/authority-http-fetch.js`）。
 1. **`bulkDelete` 条目必须携带 `namespace`**：删除按 `(namespace, externalId)` 解析内部映射，
    缺省落在 `default` 命名空间 → 报 `"externalId default:<id> is not mapped"` 且 **successCount=0 静默漏删**
    （曾致生产增量清理从未真正删除过节点，2026-09-25 修复 + 回归单测）。按内部 `id` 删除不受此限。

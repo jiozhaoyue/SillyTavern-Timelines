@@ -66,6 +66,11 @@ export function chunkTexts(texts, batchSize) {
  * @param {number} [options.batchSize=8] - 每批请求的文本数（串行逐条请求）。
  * @param {Function} [options.getHeaders] - () => object，返回宿主鉴权请求头（浏览器由 index.js 注入 getRequestHeaders）。
  * @param {Function} [options.fetchImpl] - 自定义 fetch（测试注入）；缺省用全局 fetch。
+ * @param {string} [options.model=''] - 非空时请求体附带 `model` 与 `input:[text]`（OpenAI 兼容端点），
+ *   同时保留 `text` 字段（ST 兼容中转端取所需）。
+ * @param {string} [options.apiKey=''] - 非空时携带 `Authorization: Bearer <key>` 头（密钥存宿主设置，随请求出网）。
+ * @param {Function} [options.transportResolver] - async () => fetchImpl，服务端出网通道
+ *   （如 Authority http.fetch 适配器）；首次 embed 时解析一次并缓存，解析失败计入熔断。
  * @returns {{embed: Function, dim: (number|null), resetFailure: Function}} 提供方实例。
  */
 export function createEmbeddingProvider({
@@ -73,12 +78,28 @@ export function createEmbeddingProvider({
   batchSize = 8,
   getHeaders = null,
   fetchImpl = null,
+  model = '',
+  apiKey = '',
+  transportResolver = null,
 } = {}) {
   const doFetch = fetchImpl || (typeof fetch === 'function' ? fetch : null);
   const cache = new Map(); // hashText -> vector
   let consecutiveFailures = 0;
   let dim = null;
   let broken = false;
+  let resolvedTransport = fetchImpl ?? null; // transportResolver 解析结果缓存
+
+  /**
+   * 取当前生效的 fetch 实现：显式 fetchImpl > transportResolver 解析 > 全局 fetch。
+   */
+  async function resolveFetch() {
+    if (resolvedTransport) return resolvedTransport;
+    if (typeof transportResolver === 'function') {
+      resolvedTransport = await transportResolver();
+      return resolvedTransport;
+    }
+    return doFetch;
+  }
 
   /**
    * 请求单条文本的向量。
@@ -86,16 +107,30 @@ export function createEmbeddingProvider({
    * @returns {Promise<number[]>}
    */
   async function embedSingle(text) {
-    if (!doFetch) {
+    let effectiveFetch = null;
+    try {
+      effectiveFetch = await resolveFetch();
+    } catch (err) {
+      // 通道解析失败（如 Authority 未就绪）与网络失败同责：计入熔断
+      throw new EmbeddingUnavailableError(`embedding 出网通道解析失败: ${err?.message ?? err}`, err);
+    }
+    if (!effectiveFetch) {
       throw new EmbeddingUnavailableError('当前环境无可用 fetch，无法生成向量');
     }
-    const headers = { 'Content-Type': 'application/json', ...(typeof getHeaders === 'function' ? getHeaders() : {}) };
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      ...(typeof getHeaders === 'function' ? getHeaders() : {}),
+    };
+    const body = model
+      ? JSON.stringify({ text, model, input: [text] })
+      : JSON.stringify({ text });
     let response;
     try {
-      response = await doFetch(endpoint, {
+      response = await effectiveFetch(endpoint, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ text }),
+        body,
       });
     } catch (err) {
       // 网络层失败（断网/URL 非法/超时）同样计入熔断
