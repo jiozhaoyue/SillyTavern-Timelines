@@ -815,3 +815,39 @@ Phase 0 实机 E2E（Dev Luker 8003 + Authority，L1-MF-15 断言）8/8 全绿�
 ### Next Steps
 
 - 环境恢复后补验：Phase 0 E2E 8/8 + A4 自动构建调度 + 导出留存 UI 全链路；多树视图（跨角色/群组同屏）为未裁定大特性候选待用户决策
+
+
+## Session 23: 环境恢复补验：Phase 0/2/3 + A4 实机 10/10 全绿；修复 E2E 宿主 API 潜伏误用
+<!-- trellis-session: v=2 fp=651ba51cfd313198 -->
+
+**Date**: 2026-09-26
+**Task**: 环境恢复补验：Phase 0/2/3 + A4 实机 10/10 全绿；修复 E2E 宿主 API 潜伏误用
+**Branch**: `codex-luker-chinese-refactor`
+
+### Summary
+
+重启 Dev Luker（8003）后执行补验清单。E2E 步骤1.5 潜伏 bug 暴露并修复：Luker openCharacterChat 参数是聊天文件名且只对已选中角色生效（this_chid 未定义静默 return），此前传角色索引靠实例 auto_load_chat 快捷路径掩盖；改用 selectCharacterById 后 10/10 全绿。新增步骤9 A4 自动调度实机（挂点需时间线按钮驱动渐进管线，CHAT_CHANGED 仅清 lastContextKey；静默失败 console.warn 冷却信号 + 零 toast 实证）与步骤10 导出留存 UI 全链路（画廊基线 id 差集定位新增卡片，留存→回看→下载→删除 CRUD 收口）。单测 147/147 无回归
+
+### Main Changes
+
+- E2E 步骤1.5 根因修复：openCharacterChat(角色索引) → selectCharacterById(角色索引)，零依赖 CDP 取证实测（服务端 /api/chats/get 200、openCharacterChat 对已选角色幂等、selectCharacterById 1s 内 chatId 就绪）
+- E2E 步骤9（新增）：A4 自动增量索引调度实机——数据更新→静默构建→EmbeddingUnavailableError(404) 冷却信号→零 toast，全链路通过；发现挂点驱动条件：切换会话后需 onTimelineButtonClick 跑渐进管线
+- E2E 步骤10（新增）：Phase 3 导出留存 UI 全链路——留存 toast、画廊基线快照差集定位、下载、删除，一次通过
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7ce6fff` | test(e2e): 修复步骤1.5宿主API误用并补验A4自动调度与导出留存UI（8步→10步） |
+
+### Testing
+
+- [OK] node --test tests/*.test.mjs 147/147 全绿；BASE_URL=https://127.0.0.1:8003 node tests/e2e/phase0-authority.mjs 10/10 全绿（此前 8/8 基线扩展）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 多树视图（跨角色/群组同屏）仍为未裁定大特性候选，待用户决策后按惯例出 design.md
