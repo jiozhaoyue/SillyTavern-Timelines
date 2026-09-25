@@ -14,12 +14,13 @@
 
 ## Acceptance Criteria
 
-- [ ] R1：能力面全景表覆盖全部 8 个权限资源 + 非资源面，且与 Authority 仓 `client.ts` / `capabilities-and-isolation.md` 逐项对得上
-- [ ] R2：现状盘点覆盖 5 个已落地模块并引用真实路径，局限清单与代码现状一致（含「索引构建纯手动」这一关键事实）
-- [ ] R3：≥4 个候选方向 + 不做清单，每个方向含价值/权限增量/数据边界/风险四要素；不做清单覆盖 agent.*、modules、Host Bridge、事实源违规四类
-- [ ] R4：分期路线每期有明确权限增量与验证方式，Phase 0 为实机 E2E（Dev Luker 8003，Session 19 遗留项）
-- [ ] R5：design.md 自包含；全文中文
-- [ ] 本任务为纯设计任务，不改动产品代码（`git status --short` 中不出现 src/ 与测试文件）
+- [x] R1：能力面全景表覆盖全部 8 个权限资源 + 非资源面，且与 Authority 仓 `client.ts` / `capabilities-and-isolation.md` 逐项对得上
+- [x] R2：现状盘点覆盖 5 个已落地模块并引用真实路径，局限清单与代码现状一致（含「索引构建纯手动」这一关键事实）
+- [x] R3：≥4 个候选方向 + 不做清单，每个方向含价值/权限增量/数据边界/风险四要素；不做清单覆盖 agent.*、modules、Host Bridge、事实源违规四类
+- [x] R4：分期路线每期有明确权限增量与验证方式，Phase 0 为实机 E2E（Dev Luker 8003，Session 19 遗留项）
+- [x] R5：design.md 自包含；全文中文
+- [x] 本任务为纯设计任务，不改动产品代码（`git status --short` 中不出现 src/ 与测试文件）
+- [x] 2026-09-25 用户裁定：Phase 0 → Phase 1 连做；Phase 2 / Phase 3 / A4 纳入后续计划（见 design.md §6）
 
 ## Notes
 
