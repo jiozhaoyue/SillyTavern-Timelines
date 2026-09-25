@@ -648,3 +648,51 @@ tooltip DOM 泄漏与 hover 缓存、LOD 跨角色残留、三处字段错位（
 ### Status
 
 [OK] **Completed**
+
+
+## Session 19: Authority 集成对齐审计与最小权限修正（L4 任务闭环）
+<!-- trellis-session: v=2 fp=7d9014f43a1147fb -->
+
+**Date**: 2026-09-25
+**Task**: Authority 集成对齐审计与最小权限修正（L4 任务闭环）
+**Branch**: `codex-luker-chinese-refactor`
+
+### Summary
+
+适配层 vs Authority 仓 API 面逐字段核验全一致；修正 L1-MF-5 多余权限声明；API 对齐矩阵沉淀 spec；trellis 任务回填-启动-归档闭环
+
+### Main Changes
+
+### Summary
+
+响应用户裁定（本轮范围 = 与后端插件 ST-Delegation-of-authority 结合）：完成适配层与 Authority 仓真实 API 面的逐字段对齐审计——全部一致；唯一差异是 L1-MF-5 违规（声明了未使用的 storage.kv/jobs 权限），已修正。Trellis 任务 09-24-l4-timeline-enhancement 回填 PRD→启动→归档闭环
+
+### Main Changes
+
+- 核验基准：Authority 仓 fca5329 的 packages/shared-types/{session,permissions,trivium,sql,common}.ts 与 packages/sdk-extension/{index,sdk,client}.ts
+- 核验结果：window.STAuthority.AuthoritySDK 挂载、init 配置形状（extensionId 模式 third-party/<name>、installType 枚举、declaredPermissions schema）、12 个 client 方法（trivium×8 + sql×4）的请求/响应 DTO 字段全部一致，零错位
+- 修复：AUTHORITY_DECLARED_PERMISSIONS 移除未使用的 storage.kv 与 jobs.background（Timelines 从未调用 jobs.*/storage.*，grep 证据）；测试补负断言
+- 沉淀：spec/frontend/optional-integration.md §1.3 权限描述修正，新增 §3「Authority SDK API 对齐矩阵」（自包含、含 file:line 证据，宿主升级后的重对基线）
+- 任务闭环：09-24-l4-timeline-enhancement PRD 回填（Acceptance Criteria 全勾）→ add-context ×4 → start → validate 通过 → archive/2026-09
+- 原 PRD 候选处置：语义空结果提示经核查已存在（雷达三态 UX 俱全）关闭；边标签维持关闭；多树视图另立任务
+
+### Testing
+
+- [OK] 全量 124 项单元测试 100% 通过
+- [OK] node --check 改动文件通过；task.py validate 全部通过
+
+### Next Steps
+
+- 实机 E2E（Dev Luker 实例 8003 + Authority 服务端）验证语义索引与跨会话穿越全链路
+- 多树视图（跨角色/群组同屏）为下一个大特性候选，需 design.md
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a75bbd3` | fix(authority): 最小权限修正——移除未使用的 storage.kv 与 jobs.background 声明 |
+
+### Status
+
+[OK] **Completed**
