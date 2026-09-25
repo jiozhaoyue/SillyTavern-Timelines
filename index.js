@@ -156,6 +156,7 @@ let defaultSettings = {
   lodMinChainLength: 10,
   enableStyleLod: true,
   semanticSearchEnabled: false,
+  semanticGlobalScope: false,
   semanticEndpoint: '/api/embeddings/compute',
   semanticBatchSize: 8,
   memorySaverMode: 'auto',
@@ -218,6 +219,28 @@ function makeSemanticNamespace(context) {
   return `char_${context.characterId ?? 'unknown'}`;
 }
 
+/**
+ * 取当前作用域的显示名（角色名/群组名），写入索引 payload 供跨角色结果展示（A3）。
+ * @param {object} context 宿主上下文
+ * @returns {string|null} 取不到时返回 null（payload 不写该字段，UI 回退显示 namespace 键）
+ */
+function makeSemanticNamespaceLabel(context) {
+  try {
+    if (context?.characterId != null) {
+      const char = context.characters?.[context.characterId];
+      return char?.name ? String(char.name) : null;
+    }
+    const groupId = context?.groupId;
+    if (groupId != null) {
+      const group = (context.groups ?? []).find(g => String(g?.id) === String(groupId));
+      return group?.name ? String(group.name) : null;
+    }
+  } catch {
+    /* 上下文形状变化时静默回退 */
+  }
+  return null;
+}
+
 let semanticProviderInstance = null; // 语义检索 embedding 提供方单例（会话生命周期）
 
 /**
@@ -276,6 +299,7 @@ async function loadSettings() {
     $('#tl_lod_min_chain_length').val(settings.lodMinChainLength).trigger('input');
     $('#tl_enable_style_lod').prop('checked', settings.enableStyleLod).trigger('input');
     $('#tl_semantic_enabled').prop('checked', settings.semanticSearchEnabled).trigger('input');
+    $('#tl_semantic_global_scope').prop('checked', settings.semanticGlobalScope).trigger('input');
     $('#tl_semantic_endpoint').val(settings.semanticEndpoint).trigger('input');
     $('#tl_semantic_batch_size').val(settings.semanticBatchSize).trigger('input');
     $('#tl_memory_saver_mode').val(settings.memorySaverMode).trigger('input');
@@ -1989,6 +2013,7 @@ function renderCytoscapeDiagram(nodeData, customLayout = null) {
     searchRadarInstance.configureSemantic({
       provider: getSemanticProvider(),
       namespace: makeSemanticNamespace(getTimelinesContext()),
+      globalScope: getTimelineSettings().semanticGlobalScope,
     });
 
     // 1. 同步时间树拓扑状态供外部 API 导出读取
@@ -2444,6 +2469,7 @@ jQuery(async () => {
     tl_lod_min_chain_length: 'lodMinChainLength',
     tl_enable_style_lod: 'enableStyleLod',
     tl_semantic_enabled: 'semanticSearchEnabled',
+    tl_semantic_global_scope: 'semanticGlobalScope',
     tl_semantic_endpoint: 'semanticEndpoint',
     tl_semantic_batch_size: 'semanticBatchSize',
     tl_memory_saver_mode: 'memorySaverMode',
@@ -2531,6 +2557,17 @@ jQuery(async () => {
     }
   });
 
+  $('#tl_semantic_global_scope').on('change', function () {
+    // A3：范围切换即时生效于雷达（下次语义检索起按新范围过滤）
+    if (searchRadarInstance && typeof searchRadarInstance.configureSemantic === 'function') {
+      searchRadarInstance.configureSemantic({
+        provider: getSemanticProvider(),
+        namespace: makeSemanticNamespace(getTimelinesContext()),
+        globalScope: $(this).prop('checked'),
+      });
+    }
+  });
+
   $('#tl_semantic_endpoint').on('change', function () {
     // 端点变更后重建 provider（维度/后端可能变化，雷达侧新查询自动生效）
     semanticProviderInstance = null;
@@ -2586,6 +2623,7 @@ jQuery(async () => {
       const result = await runSemanticIndexBuild({
         elements,
         namespace,
+        namespaceLabel: makeSemanticNamespaceLabel(getTimelinesContext()),
         settings,
         getHeaders: () => getRequestHeaders(),
         forceRebuild,

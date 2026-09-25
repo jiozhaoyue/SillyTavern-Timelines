@@ -70,3 +70,55 @@
 
 ---
 
+## 4. 宿主可用性实证与运行时实测语义（2026-09-25 Dev Luker 8003 E2E）
+
+> 来源：任务 `09-25-authority-phase0-phase1` Phase 0 实机 E2E（`tests/e2e/phase0-authority.mjs`，
+> L1-MF-15 启动断言：`BASE_URL` 无默认值 + Dev 端口白名单 `{8001, 8003, 8899}`）。宿主升级或
+> 换宿主后，重跑该脚本即可复核本节全部结论。
+
+### 4.1 宿主可用性结论（L0-12 的实证标注）
+
+| 宿主 | Authority 可移植子集（SDK + server plugin） | 说明 |
+| --- | --- | --- |
+| **Dev Luker（8003）** | **可用（实测）** | 实例装有 `plugins/authority`（服务端插件）、`public/scripts/extensions/third-party/st-authority-sdk`（注入 `window.STAuthority`）；适配层 `initAuthorityAdapter` 实测达 `ready`，Trivium/SQL 数据面往返全通。Host Bridge 与此无关（L0-12 禁用路径）。 |
+| Dev ST（8001） | 未验证（实例未运行） | Authority 的主宿主，理论可用，待实机复核后填表。 |
+
+**部署形态事实**：实例的 Timelines 扩展目录是指向本工作仓的 NTFS junction
+（`Instance/Dev/Luker/public/scripts/extensions/third-party/SillyTavern-Timelines → Myfork/SillyTavern-Timelines`），
+代码改动即生效（刷新页面），**部署零动作**且天然满足 L0-1（无任何文件复制）。
+
+### 4.2 Luker 宿主的 embedding 通道缺口（Phase 2 的实证依据）
+
+Luker fork 的服务端**已移除 ST 上游的 embeddings 端点**：`src/endpoints/` 下无 `embeddings.js`，
+`POST /api/embeddings/compute` 实测 404；`/api/vectors` 仅暴露 query/insert/rerank 等业务路由，
+**无原始向量化端点**。因此「语义索引构建」在 Luker 上必然失败并走设计好的降级
+（toast `构建失败: embedding 端点返回 404`、Authority 保持 `ready`、词法检索不受影响——已实测）。
+解锁路径 = Phase 2（`http.fetch` 服务端 embedding 代理）或宿主侧恢复端点。
+
+### 4.3 Trivium 运行时实测语义（对齐矩阵之外的"形状陷阱"）
+
+1. **`bulkDelete` 条目必须携带 `namespace`**：删除按 `(namespace, externalId)` 解析内部映射，
+   缺省落在 `default` 命名空间 → 报 `"externalId default:<id> is not mapped"` 且 **successCount=0 静默漏删**
+   （曾致生产增量清理从未真正删除过节点，2026-09-25 修复 + 回归单测）。按内部 `id` 删除不受此限。
+2. **`payloadFilter` 仅支持标量等值**：`{namespace}` / `{bookmark:true}` 精确过滤可用；
+   数组字段（`tags`）任何形态（`['x']` / `'x'` / `{$in}`）都不匹配，`{$has}` 直接报
+   `unsupported trivium filter operator` → 标签类筛选只能客户端后过滤（`filterHitsByPayload`），
+   并按 `SEMANTIC_POSTFILTER_TOPK_BOOST` 放大 topK 保召回。
+3. **`stat({database})` 只计已持久化节点**：bulkUpsert 后未 `flush` 时 nodeCount 可能为 0；
+   删除后 stat 也可含未压实墓碑——**以 searchHybrid 复查为准**，不要用 stat 断言增量结果。
+4. **`trivium.neighbors`**：请求 `{database, id, depth}`（**要内部数字 id**，searchHybrid hits 自带 `id`
+   可衔接）；响应 `{ids, nodes?: TriviumResolvedNodeReference[]}`，节点仅 `{id, externalId, namespace}`
+   **不含 payload**——上下文预览文本需客户端另行解析。
+5. **无 `trivium.neighbors` 特性旗标**：feature-flags 只有 `trivium.resolveId/resolveMany/tql/...`；
+   neighbors 可用性检测用「方法存在性 + try/catch 降级」（`fetchNeighborsForHits` 即此实现）。
+
+### 4.4 前端接线事实（E2E 依赖）
+
+- `#tl_semantic_enabled` 有**两个事件绑定**：`input`（通用绑定器 → `settings.semanticSearchEnabled` 持久化）
+  与 `change`（`setAuthorityFeatureEnabled` + `initAuthorityAdapter`）；自动化必须两者都触发。
+- `/api/settings/get` 响应为旧式结构（扩展设置在 `settings.extension_settings` 下，非顶层）。
+- 本实例（Dev Luker）的扩展设置**服务器持久化链路不落地**（`/api/settings/get` 中无 `timeline`/
+  `SillyTavern-Timelines` 键，显式调用宿主 `saveSettingsDebounced()` 亦然）——环境基线，设置仅会话内生效。
+
+---
+

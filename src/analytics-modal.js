@@ -13,6 +13,8 @@ import {
   formatAnalyticsMarkdown,
   formatAnalyticsJson,
 } from './analytics-service.js';
+import { getGlobalIndexStats } from './semantic-index-service.js';
+import { getAuthorityStatus, getAuthorityClient } from './adapters/authority-adapter.js';
 
 let activeModalElement = null;
 
@@ -34,6 +36,66 @@ function downloadFile(content, filename, mimeType = 'text/plain;charset=utf-8') 
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }, 100);
+}
+
+/**
+ * D1：异步填充「全库语义索引聚合」区块（L0-11：Authority 未就绪/失败时静默移除，零阻塞）。
+ *
+ * @param {HTMLElement} modal 看板弹窗根元素
+ */
+async function injectSemanticSection(modal) {
+  const section = modal.querySelector('[data-analytics-semantic]');
+  if (!section) return;
+  try {
+    if (getAuthorityStatus().status !== 'ready') {
+      section.remove();
+      return;
+    }
+    const client = await getAuthorityClient();
+    const stats = await getGlobalIndexStats({ client });
+    if (!stats?.ok || !Array.isArray(stats.groups) || stats.groups.length === 0) {
+      section.remove();
+      return;
+    }
+    const total = stats.groups.reduce((sum, g) => sum + g.count, 0);
+    const rowsHtml = stats.groups
+      .map(
+        g => `
+        <tr>
+          <td class="asf-namespace">${escapeHtmlLike(g.namespace)}</td>
+          <td class="asf-count">${g.count}</td>
+          <td class="asf-last">${g.lastIndexedAt ? escapeHtmlLike(new Date(g.lastIndexedAt).toLocaleString()) : '—'}</td>
+        </tr>`,
+      )
+      .join('');
+    section.innerHTML = `
+      <div class="analytics-section-title">
+        <i class="fa-solid fa-database"></i>
+        <span>全库语义索引聚合（Authority）</span>
+        <span class="analytics-semantic-total">${total} 条 · ${stats.groups.length} 个作用域</span>
+      </div>
+      <table class="analytics-semantic-table">
+        <thead>
+          <tr><th>作用域</th><th>已索引楼层</th><th>最近构建</th></tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>`;
+  } catch {
+    section.remove();
+  }
+}
+
+/**
+ * HTML 转义（看板区块内独立小工具，避免引入 DOM 依赖链）
+ * @param {string} value
+ */
+function escapeHtmlLike(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
 
 /**
@@ -79,6 +141,8 @@ export function openAnalyticsModal(cy) {
     </div>
 
     <div class="analytics-body">
+      <!-- D1：全库语义索引聚合（Authority 就绪时异步填充；未就绪/失败时整体移除） -->
+      <div class="analytics-semantic-section" data-analytics-semantic></div>
       <!-- 核心 KPI 卡片流 -->
       <div class="analytics-kpi-grid">
         <div class="analytics-kpi-card">
@@ -223,6 +287,9 @@ export function openAnalyticsModal(cy) {
   backdrop.appendChild(modal);
   document.body.appendChild(backdrop);
   activeModalElement = backdrop;
+
+  // D1：异步填充全库语义索引聚合区块（失败/未就绪时静默移除占位，不波及看板本体）
+  injectSemanticSection(modal);
 
   // 绑定事件
   const closeBtn = modal.querySelector('.analytics-close-btn');

@@ -3036,6 +3036,109 @@
   padding: 24px 0;
 }
 
+/* ---- Phase 1：来源徽标 / 分组头 / 邻居上下文芯片（A1/A3，作用域限弹窗内） ---- */
+.timelines-semantic-modal .semantic-source-badge {
+  font-size: 0.75rem;
+  color: #a5b4fc;
+  background: rgba(99, 102, 241, 0.18);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.timelines-semantic-modal .semantic-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #a5b4fc;
+  margin: 10px 2px 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed rgba(165, 180, 252, 0.35);
+}
+
+.timelines-semantic-modal .semantic-group-count {
+  font-size: 0.75rem;
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+.timelines-semantic-modal .semantic-result-context {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.12);
+}
+
+.timelines-semantic-modal .semantic-context-chip {
+  font-size: 0.72rem;
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.timelines-semantic-modal .semantic-context-chip:hover {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: rgba(99, 102, 241, 0.45);
+}
+
+/* ---- Phase 1：看板「全库语义索引聚合」区块（D1） ---- */
+.analytics-semantic-section {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 12px;
+}
+
+.analytics-semantic-section:empty {
+  display: none;
+}
+
+.analytics-semantic-total {
+  font-size: 0.78rem;
+  font-weight: 400;
+  opacity: 0.7;
+  margin-left: auto;
+}
+
+.analytics-semantic-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.analytics-semantic-table th,
+.analytics-semantic-table td {
+  text-align: left;
+  padding: 4px 10px;
+  border-bottom: 1px dashed rgba(148, 163, 184, 0.2);
+}
+
+.analytics-semantic-table th {
+  color: #94a3b8;
+  font-weight: 500;
+  font-size: 0.75rem;
+}
+
+.analytics-semantic-table .asf-count {
+  font-variant-numeric: tabular-nums;
+  color: #e2e8f0;
+}
+
+.analytics-semantic-table .asf-last {
+  color: #94a3b8;
+  font-size: 0.75rem;
+}
+
 /* ===================== 渐进加载进度条（全程常驻胶囊） ===================== */
 
 .timelines-load-progress {

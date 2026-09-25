@@ -271,17 +271,22 @@ SillyTavern-Timelines 原生旨在为大语言模型角色扮演（LLM Roleplay�
 
 - **设置面板**（扩展设置 → 语义检索）：
   - `启用语义检索`：总开关，开启后搜索雷达自动追加语义模式入口。
+  - `跨角色全局检索（含其他角色）`：默认关闭（仅当前角色）；开启后检索不再限定当前角色，跨会话结果按来源角色分组并显示来源徽标。
   - `Embedding 端点` 与 `批量大小`：对接宿主向量化接口（默认 `/api/embeddings/compute`）。
   - 面板实时显示 Authority 就绪状态与索引统计（节点数、向量维度、最近索引时间）。
 - **语义索引构建 (`src/semantic-index-service.js`)**：
   - 直接枚举当前图谱的 `chat_sessions` 覆盖全部 (会话, 楼层)，以 `content_hash` 内容指纹做增量 diff，只重索引新增或变化条目。
   - externalId 契约：`<chatFile>::<messageId>`；向量维度进入库名（`tl_vec_<dim>`），embedding 后端更换导致维度变化时天然切库、绝不混维度。
   - 同会话相邻楼层自动合成 `next` 图链边，辅助上下文邻近召回。
+  - 索引 payload 携带作用域键与显示名（`namespace` / `namespaceLabel`），跨角色结果可读来源。
 - **雷达语义模式 (`src/semantic-search-service.js`)**：
   - Trivium `searchHybrid` 向量 + BM25 双通道混合检索（权重 0.5）。
-  - 命中映射回当前内存图谱节点：已打开分支重排聚焦；未映射命中（其他分支会话）进入**跨会话结果弹窗**，显示会话名、楼层、角色与预览，一键时空穿越跳转对应楼层。
+  - 复合筛选与语义模式打通：书签走服务端 `payloadFilter` 等值过滤；彩色标签/说话人走客户端后过滤（自动放大召回量补偿）。
+  - 命中映射回当前内存图谱节点：已打开分支重排聚焦；未映射命中（其他分支会话）进入**跨会话结果弹窗**，显示会话名、楼层、角色、来源角色与预览，一键时空穿越跳转对应楼层；每张卡可展开**相邻楼层上下文芯片**（Trivium 图链 ±1 楼，点击直达）。
+- **全库语义索引聚合 (`src/semantic-index-service.js` `getGlobalIndexStats`)**：数据看板新增「全库语义索引聚合」区块，按角色/群组作用域统计已索引楼层数与最近构建时间（Authority 未就绪或无数据时自动隐藏）。
 - **熔断降级 (`src/embedding-provider.js`)**：embedding 接口连续失败时自动熔断，本次会话内回退纯文本检索，绝不阻塞主流程。
 - **数据哲学**：索引与状态表全部是原生数据的派生投影，删除 Authority 数据即等于重置，可随时全量重建。
+- **宿主可用性**：实测 Dev Luker（8003）上 Authority 可移植子集全链路可用（适配层 ready、Trivium/SQL 数据面往返）；注意 Luker fork 已移除宿主 embedding 端点（`/api/embeddings/compute` 404），在该宿主构建索引需先解决向量化通道（如经 Authority `http.fetch` 的服务端代理，见 `.trellis/spec/frontend/optional-integration.md` §4）。
 
 ---
 

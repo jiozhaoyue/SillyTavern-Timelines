@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/frontend/optional-integration.md", "reason": "Authority 集成范式（五态状态机/最小权限/派生投影）与 SDK API 对齐矩阵（重对基线）"}
+{"file": ".trellis/spec/frontend/luker-plugin-standards.md", "reason": "Luker 插件规范：样式双前缀、实例端口与 E2E 纪律"}
+{"file": ".trellis/tasks/archive/2026-09/09-25-authority-integration-design/design.md", "reason": "上游设计：能力面全景/候选方向/分期路线与全部 file:line 证据"}

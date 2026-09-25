@@ -293,15 +293,17 @@ export class SemanticIndexer {
    * @param {object} options.client - Authority client（trivium.* / sql.* 可用）。
    * @param {object} options.provider - embedding 提供方（createEmbeddingProvider 实例）。
    * @param {string} options.namespace - 索引命名空间（角色/群组作用域键）。
+   * @param {string} [options.namespaceLabel] - 作用域显示名（角色/群组名），写入 payload 供跨角色结果展示。
    * @param {Function} [options.onProgress] - ({phase, done, total, message}) => void。
    * @param {Function} [options.resolveFullText] - async (nodeData) => string|null，省内存模式下解析节点全文。
    */
-  constructor({ client, provider, namespace, onProgress = null, resolveFullText = null }) {
+  constructor({ client, provider, namespace, namespaceLabel = null, onProgress = null, resolveFullText = null }) {
     if (!client) throw new Error('SemanticIndexer 需要 Authority client');
     if (!provider) throw new Error('SemanticIndexer 需要 embedding provider');
     this.client = client;
     this.provider = provider;
     this.namespace = String(namespace ?? 'default');
+    this.namespaceLabel = namespaceLabel != null ? String(namespaceLabel) : null;
     this.onProgress = typeof onProgress === 'function' ? onProgress : null;
     this.resolveFullText = typeof resolveFullText === 'function' ? resolveFullText : null;
     this._cancelled = false;
@@ -387,16 +389,18 @@ export class SemanticIndexer {
         const oldDbNames = [...new Set(oldDbRows.map(r => String(r.trivium_db)))];
         for (const oldDb of oldDbNames) {
           if (this._cancelled) break;
-          const items = oldDbRows
-            .filter(r => String(r.trivium_db) === oldDb)
-            .map(r => ({ externalId: encodeExternalId(r.chat_file, r.message_id) }));
+        const items = oldDbRows
+          .filter(r => String(r.trivium_db) === oldDb)
+          .map(r => ({ externalId: encodeExternalId(r.chat_file, r.message_id), namespace: this.namespace }));
           for (const chunk of chunkTexts(items, LINK_BATCH_SIZE)) {
             await this.client.trivium.bulkDelete({ database: oldDb, items: chunk });
           }
         }
       }
       if (deletes.length > 0) {
-        for (const chunk of chunkTexts(deletes.map(externalId => ({ externalId })), LINK_BATCH_SIZE)) {
+        // 删除条目必须携带写入时的 namespace：Authority 按 (namespace, externalId) 解析映射，
+        // 缺省落在 default 命名空间会得到 "not mapped" 而静默漏删（2026-09-25 Phase 0 实机实证）。
+        for (const chunk of chunkTexts(deletes.map(externalId => ({ externalId, namespace: this.namespace })), LINK_BATCH_SIZE)) {
           if (this._cancelled) break;
           await this.client.trivium.bulkDelete({ database: targetDb, items: chunk });
         }
@@ -419,7 +423,11 @@ export class SemanticIndexer {
           externalId: entry.externalId,
           namespace: this.namespace,
           vector: vectorBatch[i],
-          payload: { ...buildNodePayload(entry.nodeData, entry.chatFile, entry.messageId), namespace: this.namespace },
+          payload: {
+            ...buildNodePayload(entry.nodeData, entry.chatFile, entry.messageId),
+            namespace: this.namespace,
+            ...(this.namespaceLabel ? { namespaceLabel: this.namespaceLabel } : {}),
+          },
         }));
         const resp = await this.client.trivium.bulkUpsert({ database: targetDb, items });
 
@@ -512,6 +520,7 @@ export class SemanticIndexer {
  * @param {object} options
  * @param {Array<object>} options.elements - 图谱元素（推荐 window.TimelinesExtensionApi.getTimelineTree()）。
  * @param {string} options.namespace - 作用域键（如 char_12 / group_3）。
+ * @param {string} [options.namespaceLabel] - 作用域显示名（角色/群组名），供跨角色结果展示。
  * @param {object} options.settings - Timelines 设置（semanticEndpoint / semanticBatchSize）。
  * @param {Function} [options.getHeaders] - 宿主鉴权头获取函数（getRequestHeaders）。
  * @param {boolean} [options.forceRebuild=false]
@@ -522,6 +531,7 @@ export class SemanticIndexer {
 export async function runSemanticIndexBuild({
   elements,
   namespace,
+  namespaceLabel = null,
   settings = {},
   getHeaders = null,
   forceRebuild = false,
@@ -538,7 +548,7 @@ export async function runSemanticIndexBuild({
     batchSize: Number(settings.semanticBatchSize) || 8,
     getHeaders,
   });
-  const indexer = new SemanticIndexer({ client, provider, namespace, onProgress, resolveFullText });
+  const indexer = new SemanticIndexer({ client, provider, namespace, namespaceLabel, onProgress, resolveFullText });
   return await indexer.build({ elements, forceRebuild });
 }
 
@@ -603,4 +613,47 @@ export async function getSemanticIndexStatus({ namespace }) {
   } catch (err) {
     return { ok: false, error: err?.message ?? String(err), nodeCount: 0, edgeCount: 0, vectorDim: null, database: null, indexedCount: 0, lastIndexedAt: null };
   }
+}
+
+/**
+ * 全库语义索引聚合统计（D1，IO 薄层）：按 namespace 聚合 index_state。
+ *
+ * 数据全部来自可重建的派生状态表；Authority 未就绪或查询失败时返回 ok:false（UI 静默隐藏该区块）。
+ *
+ * @param {object} options
+ * @param {object} options.client - Authority client。
+ * @returns {Promise<{ok: boolean, groups: Array<{namespace: string, count: number, lastIndexedAt: string|null}>, error: string|null}>}
+ */
+export async function getGlobalIndexStats({ client }) {
+  if (!client) {
+    return { ok: false, groups: [], error: 'Authority client 未就绪' };
+  }
+  try {
+    await client.sql.migrate({ database: 'main', migrations: INDEX_STATE_MIGRATIONS });
+    const resp = await client.sql.query({
+      database: 'main',
+      statement: 'SELECT namespace, COUNT(*) AS cnt, MAX(indexed_at) AS last_at FROM index_state GROUP BY namespace ORDER BY cnt DESC',
+    });
+    const rows = resp?.rows ?? resp ?? [];
+    return { ok: true, groups: aggregateIndexStateByNamespace(rows), error: null };
+  } catch (err) {
+    return { ok: false, groups: [], error: err?.message ?? String(err) };
+  }
+}
+
+/**
+ * 聚合 index_state 行（纯函数，供 Node 测试与 getGlobalIndexStats 复用）。
+ *
+ * @param {Array<{namespace: string, cnt: number|string, last_at?: string|null}>} rows
+ * @returns {Array<{namespace: string, count: number, lastIndexedAt: string|null}>}
+ */
+export function aggregateIndexStateByNamespace(rows) {
+  const source = Array.isArray(rows) ? rows : [];
+  return source
+    .map(row => ({
+      namespace: String(row?.namespace ?? 'unknown'),
+      count: Number(row?.cnt ?? 0) || 0,
+      lastIndexedAt: row?.last_at ?? null,
+    }))
+    .sort((a, b) => b.count - a.count || a.namespace.localeCompare(b.namespace));
 }

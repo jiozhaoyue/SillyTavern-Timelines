@@ -188,3 +188,22 @@ test('formatAnalyticsMarkdown and formatAnalyticsJson generate valid reports', (
   assert.equal(parsed.totalNodes, 10);
   assert.equal(parsed.speakers.character.words, 900);
 });
+
+// ===================== Phase 1 D1：全库语义索引聚合 =====================
+
+test('aggregateIndexStateByNamespace 聚合排序且容错空输入', async () => {
+  const { aggregateIndexStateByNamespace } = await import('../src/semantic-index-service.js');
+  const rows = [
+    { namespace: 'char_2', cnt: 12, last_at: '2026-09-25T10:00:00Z' },
+    { namespace: 'char_1', cnt: 30, last_at: null },
+    { namespace: 'group_3', cnt: 12, last_at: '2026-09-24T09:00:00Z' },
+    { namespace: null, cnt: '5' }, // 字符串计数与缺省命名空间容错
+  ];
+  const groups = aggregateIndexStateByNamespace(rows);
+  assert.deepEqual(groups.map(g => g.namespace), ['char_1', 'char_2', 'group_3', 'unknown']);
+  assert.deepEqual(groups.map(g => g.count), [30, 12, 12, 5]);
+  assert.equal(groups[0].lastIndexedAt, null);
+  assert.equal(groups[1].lastIndexedAt, '2026-09-25T10:00:00Z');
+  assert.deepEqual(aggregateIndexStateByNamespace([]), []);
+  assert.deepEqual(aggregateIndexStateByNamespace(null), []);
+});

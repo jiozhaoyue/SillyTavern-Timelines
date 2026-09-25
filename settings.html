@@ -348,6 +348,15 @@
           </div>
           <div class="timeline-view-settings_block flex-container">
             <label
+              for="tl_semantic_global_scope"
+              title="开启后语义检索不再限定当前角色，命中全部已索引角色的楼层；跨会话结果将按来源角色分组展示。默认关闭（仅当前角色）。"
+              data-i18n="[title]开启后语义检索不再限定当前角色，命中全部已索引角色的楼层；跨会话结果将按来源角色分组展示。默认关闭（仅当前角色）。"
+              >跨角色全局检索（含其他角色）</label
+            >
+            <input id="tl_semantic_global_scope" type="checkbox" />
+          </div>
+          <div class="timeline-view-settings_block flex-container">
+            <label
               for="tl_semantic_endpoint"
               title="向量化端点；默认使用 SillyTavern 原生 embedding 接口。更换 embedding 后端会改变向量维度并自动切换索引库。"
               data-i18n="[title]向量化端点；默认使用 SillyTavern 原生 embedding 接口。更换 embedding 后端会改变向量维度并自动切换索引库。"

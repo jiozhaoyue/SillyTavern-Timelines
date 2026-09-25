@@ -11,7 +11,7 @@
 
 import { filterGraphNodes } from './search-service.js';
 import { debounce } from './helpers.js';
-import { semanticSearch, mapHitsToNodes, formatGlobalResults, SEMANTIC_TOP_K } from './semantic-search-service.js';
+import { semanticSearch, mapHitsToNodes, formatGlobalResults, fetchNeighborsForHits, SEMANTIC_TOP_K } from './semantic-search-service.js';
 import { getAuthorityStatus, onAuthorityStatusChange, getAuthorityClient } from './adapters/authority-adapter.js';
 import { openSemanticGlobalModal } from './semantic-global-modal.js';
 
@@ -187,7 +187,7 @@ export class SearchRadar {
       globalBadge.innerHTML = '<i class="fa-solid fa-globe"></i> <span class="global-badge-count">0</span>';
       globalBadge.addEventListener('click', () => {
         if (this.globalResults.length > 0) {
-          openSemanticGlobalModal(this.globalResults, { query: this.filters.query });
+          openSemanticGlobalModal(this.globalResults, { query: this.filters.query, groupByNamespace: this._semanticGlobalScope });
         }
       });
 
@@ -335,12 +335,20 @@ export class SearchRadar {
         throw new Error('语义提供方未就绪');
       }
 
+      // 筛选映射（Phase 1）：书签走服务端 payloadFilter；标签/说话人走客户端后过滤（payloadFilter 不支持数组）
+      const postFilter = this.filters.onlyTagged || this.filters.speakerFilter !== 'all'
+        ? { onlyTagged: this.filters.onlyTagged, speakerFilter: this.filters.speakerFilter }
+        : null;
+
       const hits = await semanticSearch({
         client,
         provider,
         queryText: this.filters.query,
         topK: SEMANTIC_TOP_K,
         namespace: this._semanticNamespace ?? undefined,
+        bookmark: this.filters.onlyBookmarks,
+        scope: this._semanticGlobalScope ? 'global' : 'character',
+        postFilter,
       });
 
       const cyNodes = typeof this.cy.nodes === 'function' ? this.cy.nodes().toArray() : [];
@@ -348,6 +356,20 @@ export class SearchRadar {
 
       this.matchedNodes = matched.map(m => m.node);
       this.globalResults = formatGlobalResults(unmatched);
+
+      // A1 语义上下文：为跨会话结果拉取 ±1 楼邻居（失败静默降级为无上下文）
+      if (this.globalResults.length > 0 && provider.dim) {
+        try {
+          const neighbors = await fetchNeighborsForHits({ client, database: `tl_vec_${provider.dim}`, hits: unmatched });
+          if (neighbors.size > 0) {
+            for (const row of this.globalResults) {
+              const refs = neighbors.get(row.externalId);
+              if (refs) row.context = refs;
+            }
+          }
+        } catch { /* 上下文扩展失败不影响结果展示 */ }
+      }
+
       this.updateGlobalBadge();
 
       if (this.matchedNodes.length === 0 && this.globalResults.length === 0) {
@@ -419,15 +441,17 @@ export class SearchRadar {
   }
 
   /**
-   * 由宿主（index.js）注入语义检索依赖：embedding 提供方与作用域键。
+   * 由宿主（index.js）注入语义检索依赖：embedding 提供方、作用域键与范围设置。
    *
    * @param {object} options
    * @param {object} options.provider - createEmbeddingProvider 实例。
    * @param {string} [options.namespace] - 角色作用域键（payloadFilter 过滤）。
+   * @param {boolean} [options.globalScope] - 跨角色全局检索开关（A3；开启后不加 namespace 过滤）。
    */
-  configureSemantic({ provider, namespace = null }) {
+  configureSemantic({ provider, namespace = null, globalScope = false }) {
     this._semanticProvider = provider ?? null;
     this._semanticNamespace = namespace ?? null;
+    this._semanticGlobalScope = Boolean(globalScope);
   }
 
   /**

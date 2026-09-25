@@ -6,6 +6,7 @@
 
 # 端到端自动化验证截图
 luker_timelines_*.png
+tests/e2e/artifacts/
 
 # Node / Python 运行时产物
 node_modules/

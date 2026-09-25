@@ -238,3 +238,67 @@ test('resolveEntryFullTexts resolves truncated previews once per node and keeps 
   assert.equal(passthrough[0].nodeData.msg, '全文');
   assert.equal(await resolveEntryFullTexts(entries, null), entries);
 });
+
+test('SemanticIndexer.build 删除条目必须携带 namespace（Phase 0 实机实证：缺省落 default 会静默漏删）', async () => {
+  const { SemanticIndexer } = await import('../src/semantic-index-service.js');
+
+  const deleteCalls = [];
+  const upsertCalls = [];
+  const client = {
+    sql: {
+      migrate: async () => ({}),
+      query: async () => ({
+        rows: [{ chat_file: 'c', message_id: 0, content_hash: 'stale', trivium_db: 'tl_vec_8' }],
+      }),
+      batch: async () => ({}),
+      exec: async () => {},
+    },
+    trivium: {
+      bulkUpsert: async ({ items }) => {
+        upsertCalls.push({ items });
+        return { items: items.map((it, i) => ({ id: 100 + i, externalId: it.externalId, namespace: it.namespace, action: 'upserted' })) };
+      },
+      bulkDelete: async ({ database, items }) => {
+        deleteCalls.push({ database, items });
+        return { totalCount: items.length, successCount: items.length, failureCount: 0, failures: [] };
+      },
+      bulkLink: async () => ({}),
+      indexText: async () => ({}),
+      createIndex: async () => ({}),
+      flush: async () => ({}),
+      stat: async () => ({ nodeCount: 0, edgeCount: 0, vectorDim: 8 }),
+      searchHybrid: async () => [],
+    },
+  };
+  const provider = { embed: async texts => texts.map(() => Array.from({ length: 8 }, (_, i) => 0.1 * i)) };
+
+  const elements = [
+    { data: { id: 'n1', msg: '现存节点正文', chat_sessions: { c: { messageId: 1 } } } },
+  ];
+  const indexer = new SemanticIndexer({ client, provider, namespace: 'char_1', namespaceLabel: '青' });
+  const result = await indexer.build({ elements });
+
+  // 已消失条目 c::0（状态表登记于 tl_vec_8=目标库之外的旧库形态由 staleOtherDb 清理）+
+  // 目标库内的删除都必须携带 namespace
+  const allDeleteItems = deleteCalls.flatMap(c => c.items);
+  assert.ok(allDeleteItems.length >= 1, '应至少触发一次删除');
+  for (const item of allDeleteItems) {
+    assert.equal(item.namespace, 'char_1', '删除条目必须携带写入时的 namespace');
+  }
+  assert.equal(result.database, 'tl_vec_8');
+
+  // A3：namespaceLabel 写入 payload（旧条目/未传 label 时不存在该字段）
+  const upsertedPayloads = upsertCalls.flatMap(c => c.items).map(it => it.payload);
+  assert.ok(upsertedPayloads.length >= 1);
+  for (const payload of upsertedPayloads) {
+    assert.equal(payload.namespace, 'char_1');
+    assert.equal(payload.namespaceLabel, '青');
+  }
+
+  const plainIndexer = new SemanticIndexer({ client, provider, namespace: 'char_1' });
+  await plainIndexer.build({ elements });
+  const plainPayloads = upsertCalls.at(-1).items.map(it => it.payload);
+  for (const payload of plainPayloads) {
+    assert.equal('namespaceLabel' in payload, false, '未传 label 时 payload 不携带该字段');
+  }
+});
