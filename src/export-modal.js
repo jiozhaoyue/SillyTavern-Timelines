@@ -10,6 +10,7 @@ import {
   copyBlobToClipboard,
   formatExportFilename,
 } from './export-service.js';
+import { keepExportAfterDownload } from './export-history-service.js';
 import { escapeHtml } from './helpers.js';
 
 /**
@@ -164,11 +165,21 @@ export function openExportModal(cy, context = null) {
         const svgBlob = exportTimelineAsSvg(cy, opts);
         const filename = formatExportFilename(characterName, 'svg');
         triggerDownload(svgBlob, filename);
+        keepExportAfterDownload({ blob: svgBlob, filename, label: characterName })
+          .then(r => {
+            if (r?.saved) toastr.info(`已留存到服务端导出历史（${Math.round((r.record?.size ?? 0) / 1024)} KB）`);
+          })
+          .catch(err => console.warn('[Export] 服务端留存失败:', err));
         toastr.success('已开始下载 SVG 矢量图谱');
       } else {
         const pngBlob = await exportTimelineAsPng(cy, opts);
         const filename = formatExportFilename(characterName, 'png');
         triggerDownload(pngBlob, filename);
+        keepExportAfterDownload({ blob: pngBlob, filename, label: characterName })
+          .then(r => {
+            if (r?.saved) toastr.info(`已留存到服务端导出历史（${Math.round((r.record?.size ?? 0) / 1024)} KB）`);
+          })
+          .catch(err => console.warn('[Export] 服务端留存失败:', err));
         toastr.success(`已生成 ${opts.scale}x 高清长图 (${Math.round(pngBlob.size / 1024)} KB)`);
       }
       close();

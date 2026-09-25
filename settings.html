@@ -441,6 +441,36 @@
         </div>
         <div class="timeline-view-settings_block flex-container">
           <input
+            value="服务端导出留存 (Authority)"
+            class="menu_button"
+            type="button"
+            id="toggleExportKeepSettings"
+            title="将每次导出的 PNG/SVG 同时留存到 Authority 服务端，形成可随时回看的导出历史。数据为可重建的派生物，默认关闭。"
+            data-i18n="[title]将每次导出的 PNG/SVG 同时留存到 Authority 服务端，形成可随时回看的导出历史。数据为可重建的派生物，默认关闭。"
+          />
+        </div>
+        <div id="exportKeepSettingsArea" class="hidden">
+          <div class="timeline-view-settings_block flex-container">
+            <label
+              for="tl_export_server_keep"
+              title="开启后，每次导出 PNG/SVG 时会同时留存一份到 Authority 服务端（可从「导出历史」重新下载）。数据可随时从图谱重建，卸载 Authority 后本地功能不受影响。默认关闭。"
+              data-i18n="[title]开启后，每次导出 PNG/SVG 时会同时留存一份到 Authority 服务端（可从「导出历史」重新下载）。数据可随时从图谱重建，卸载 Authority 后本地功能不受影响。默认关闭。"
+              >导出留存到服务端（需 Authority）</label
+            >
+            <input id="tl_export_server_keep" type="checkbox" />
+          </div>
+          <div class="timeline-view-settings_block flex-container" style="gap: 8px">
+            <input
+              id="tl_export_history_btn"
+              class="menu_button"
+              type="button"
+              value="🗂 导出历史"
+              title="查看服务端留存的导出物（时间倒序），可重新下载或删除。"
+            />
+          </div>
+        </div>
+        <div class="timeline-view-settings_block flex-container">
+          <input
             value="LOD 性能优化"
             class="menu_button"
             type="button"

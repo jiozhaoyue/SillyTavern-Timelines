@@ -98,6 +98,7 @@ import { initMemoryGraphAdapter } from './src/adapters/memory-graph-adapter.js';
 import { initAuthorityAdapter, setAuthorityFeatureEnabled, getAuthorityStatus, getAuthorityClient } from './src/adapters/authority-adapter.js';
 import { createAuthorityHttpFetchAdapter } from './src/authority-http-fetch.js';
 import { getSemanticIndexStatus, runSemanticIndexBuild, createAutoIndexThrottle } from './src/semantic-index-service.js';
+import { openExportHistoryModal } from './src/export-history-modal.js';
 import { createEmbeddingProvider } from './src/embedding-provider.js';
 import { detectDeviceProfile } from './src/memory-profile.js';
 import { createProgressState, mountProgressOverlay } from './src/load-progress.js';
@@ -164,6 +165,7 @@ let defaultSettings = {
   semanticAutoIndex: false,
   semanticEndpoint: '/api/embeddings/compute',
   semanticBatchSize: 8,
+  exportServerKeep: false,
   memorySaverMode: 'auto',
 };
 
@@ -345,6 +347,7 @@ async function loadSettings() {
     $('#tl_semantic_http_model').val(settings.semanticHttpModel).trigger('input');
     $('#tl_semantic_http_key').val(settings.semanticHttpKey).trigger('input');
     $('#tl_semantic_auto_index').prop('checked', settings.semanticAutoIndex).trigger('input');
+    $('#tl_export_server_keep').prop('checked', settings.exportServerKeep).trigger('input');
     $('#tl_semantic_endpoint').val(settings.semanticEndpoint).trigger('input');
     $('#tl_semantic_batch_size').val(settings.semanticBatchSize).trigger('input');
     $('#tl_memory_saver_mode').val(settings.memorySaverMode).trigger('input');
@@ -2523,6 +2526,7 @@ jQuery(async () => {
     tl_semantic_http_model: 'semanticHttpModel',
     tl_semantic_http_key: 'semanticHttpKey',
     tl_semantic_auto_index: 'semanticAutoIndex',
+    tl_export_server_keep: 'exportServerKeep',
     tl_semantic_endpoint: 'semanticEndpoint',
     tl_semantic_batch_size: 'semanticBatchSize',
     tl_memory_saver_mode: 'memorySaverMode',
@@ -2597,6 +2601,14 @@ jQuery(async () => {
     if (!$('#semanticSettingsArea').hasClass('hidden')) {
       updateSemanticStatusUI();
     }
+  });
+
+  $('#toggleExportKeepSettings').click(function () {
+    $('#exportKeepSettingsArea').toggleClass('hidden');
+  });
+
+  $('#tl_export_history_btn').on('click', () => {
+    openExportHistoryModal();
   });
 
   $('#tl_semantic_enabled').on('change', function () {

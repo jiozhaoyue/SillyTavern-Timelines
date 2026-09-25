@@ -285,6 +285,7 @@ SillyTavern-Timelines 原生旨在为大语言模型角色扮演（LLM Roleplay�
   - 命中映射回当前内存图谱节点：已打开分支重排聚焦；未映射命中（其他分支会话）进入**跨会话结果弹窗**，显示会话名、楼层、角色、来源角色与预览，一键时空穿越跳转对应楼层；每张卡可展开**相邻楼层上下文芯片**（Trivium 图链 ±1 楼，点击直达）。
 - **全库语义索引聚合 (`src/semantic-index-service.js` `getGlobalIndexStats`)**：数据看板新增「全库语义索引聚合」区块，按角色/群组作用域统计已索引楼层数与最近构建时间（Authority 未就绪或无数据时自动隐藏）。
 - **熔断降级 (`src/embedding-provider.js`)**：embedding 接口连续失败时自动熔断，本次会话内回退纯文本检索，绝不阻塞主流程。
+- **导出服务端留存 (`src/export-history-service.js`，可选)**：「服务端导出留存 (Authority)」开关开启后，每次导出 PNG/SVG 会同时留存一份到 Authority blob（`tl-export/` 前缀，超大文件自动分块传输），设置区「🗂 导出历史」可按时间倒序回看、重新下载或删除；数据为可从图谱重建的派生物，卸载 Authority 后本地功能完好。
 - **服务端出网通道 (`src/authority-http-fetch.js`，可选)**：「经 Authority 服务端出网」开关开启后，向量化请求经 `client.http.fetch` 由服务端代理出网（按 hostname 授权并纳入审计），绕过浏览器 CORS；可配合「Embedding 模型名 / API 密钥」对接 OpenAI 兼容端点（请求体同时携带 `model`+`input` 与 `text` 双兼容字段）。注意：环回地址被 Authority SSRF 规则封锁；其余 hostname 需管理员策略放行；密钥随请求头传出，Authority 不保管密钥。
 - **数据哲学**：索引与状态表全部是原生数据的派生投影，删除 Authority 数据即等于重置，可随时全量重建。
 - **宿主可用性**：实测 Dev Luker（8003）上 Authority 可移植子集全链路可用（适配层 ready、Trivium/SQL 数据面往返）；注意 Luker fork 已移除宿主 embedding 端点（`/api/embeddings/compute` 404），在该宿主构建索引需先解决向量化通道（如经 Authority `http.fetch` 的服务端代理，见 `.trellis/spec/frontend/optional-integration.md` §4）。

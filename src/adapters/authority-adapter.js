@@ -26,6 +26,7 @@ export const AUTHORITY_EXTENSION_ID = 'third-party/sillytavern-timelines';
  *   - client.sql.*：migrate / query / batch / exec（index_state 状态表）
  *   - client.http.fetch：embedding 服务端出网代理（Phase 2，按 hostname 运行时授权；
  *     设置开关默认关，仅在用户启用服务端出网通道时实际调用）
+ *   - client.storage.blob：导出物服务端留存（Phase 3，设置开关默认关；只声明 blob 不声明 kv）
  * 未使用的能力（storage.kv / jobs.background / fs / agent）一律不声明，
  * 避免用户在 Security Center 授权弹窗看到多余风险项。
  */
@@ -33,6 +34,7 @@ export const AUTHORITY_DECLARED_PERMISSIONS = {
   trivium: { private: true },
   sql: { private: true },
   http: { fetch: true },
+  storage: { blob: true },
 };
 
 /** 合法状态集合 */

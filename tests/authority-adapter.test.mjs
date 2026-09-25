@@ -95,10 +95,11 @@ test('initAuthorityAdapter reaches ready with a present SDK and exposes the clie
   assert.deepEqual(capturedConfig.declaredPermissions, AUTHORITY_DECLARED_PERMISSIONS);
   assert.ok(!('agent' in capturedConfig.declaredPermissions));
   assert.ok(!('fs' in capturedConfig.declaredPermissions));
-  // Phase 2：http.fetch 为 embedding 服务端出网代理（设置默认关，仅启用时实际调用）
+  // Phase 2/3：http.fetch 为 embedding 服务端出网代理；storage.blob 为导出留存（均设置默认关，仅启用时实际调用）
   assert.deepEqual(capturedConfig.declaredPermissions.http, { fetch: true });
-  // L1-MF-5：未实际使用的能力不得声明（Timelines 只调用 trivium.* / sql.* / http.fetch）
-  assert.ok(!('storage' in capturedConfig.declaredPermissions));
+  assert.deepEqual(capturedConfig.declaredPermissions.storage, { blob: true });
+  // L1-MF-5：未实际使用的能力不得声明（kv / jobs / fs / agent 从未使用）
+  assert.ok(!('kv' in (capturedConfig.declaredPermissions.storage ?? {})));
   assert.ok(!('jobs' in capturedConfig.declaredPermissions));
 
   // 幂等：二次 init 不再调用 SDK
