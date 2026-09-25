@@ -96,6 +96,9 @@ test('initAuthorityAdapter reaches ready with a present SDK and exposes the clie
   assert.ok(!('agent' in capturedConfig.declaredPermissions));
   assert.ok(!('fs' in capturedConfig.declaredPermissions));
   assert.ok(!('http' in capturedConfig.declaredPermissions));
+  // L1-MF-5：未实际使用的能力不得声明（Timelines 只调用 trivium.* 与 sql.*）
+  assert.ok(!('storage' in capturedConfig.declaredPermissions));
+  assert.ok(!('jobs' in capturedConfig.declaredPermissions));
 
   // 幂等：二次 init 不再调用 SDK
   let extraCall = 0;

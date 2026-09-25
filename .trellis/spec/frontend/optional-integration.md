@@ -10,7 +10,7 @@
 
 1. **能力嗅探 + 全空值防御**：所有探测点写成 `window.STAuthority?.AuthoritySDK`；模块级单例状态机（`absent / disabled / connecting / ready / error`）统一管理生命周期，禁止散落的布尔标记。
 2. **零硬依赖**：未安装时全模块静默休眠（`absent` 短路），主链路零新增 console error、零 UI 空壳。UI 注入点必须容忍"就绪晚于 UI 创建"（有限次重试 + 单次状态订阅，禁止无界重试风暴；错误态冷却 60s）。
-3. **最小权限声明**：只声明实际用到的权限（本插件：`trivium.private`、`sql.private`、`storage.kv`、`jobs.background`）；绝不顺手声明 `agent.*` / `fs.*` / `http.*`。
+3. **最小权限声明**：只声明实际调用到的权限；绝不顺手声明 `agent.*` / `fs.*` / `http.*`，未使用的能力（如 `storage.kv`、`jobs.background`）同样不得声明——多余声明会让用户在 Security Center 授权弹窗看到不存在的风险项。当前实际使用面仅 `trivium.private` 与 `sql.private`（2026-09-25 审计修正）。
 4. **派生数据唯一原则**：外部服务端只允许保存"可随时全量重建的派生投影"（向量索引、状态表）。原生 `message.extra` / `chat.jsonl` 永远是唯一数据源——卸载外部插件后插件功能必须完好。
 5. **降级路径显式化**：任何集成失败（断网/拒权/维度切换）只降级该功能自身并向用户 toast 说明，绝不静默吞错、绝不波及词法检索等既有功能。
 
@@ -27,4 +27,46 @@
 
 ---
 
-**Language**: All documentation must be written in **English**. (实现层注释保持中文与现有代码一致；本 spec 面向 AI/开发者，正文可中文。)
+## 3. Authority SDK API 对齐矩阵（2026-09-25 逐字段核验）
+
+> 核验基准：`ST-Delegation-of-authority`（jiozhaoyue fork）`packages/shared-types/src/*.ts` 与
+> `packages/sdk-extension/src/{index,sdk,client}.ts`。Timelines 侧契约定义在
+> `src/adapters/authority-adapter.js`；调用方为 `src/semantic-index-service.js` 与
+> `src/semantic-search-service.js`。宿主升级后如遇"语义功能静默失效"，先重对本矩阵。
+
+**接入入口**
+
+| Timelines 侧 | Authority 侧 | 结论 |
+| --- | --- | --- |
+| `window.STAuthority?.AuthoritySDK` | `sdk-extension/src/index.ts:7` 挂载 `window.STAuthority = { AuthoritySDK, openSecurityCenter }` | 一致 |
+| `AuthoritySDK.init({extensionId, displayName, version, installType, declaredPermissions})` → `Promise<client>` | `AuthorityInitConfig`（`shared-types/session.ts`）+ `static async init`（`sdk.ts:13`，按 extensionId 幂等加锁） | 一致 |
+| `extensionId: 'third-party/sillytavern-timelines'` | 服务端 owner id 段模式 `third-party/<name>`（`module-discovery-service.ts:39`） | 一致 |
+| `installType: 'local'` | `InstallType = 'system' \| 'local' \| 'global'` | 一致 |
+| `declaredPermissions: {trivium: {private: true}, sql: {private: true}}` | `DeclaredPermissions`（`permissions.ts`：`trivium.private`/`sql.private` 接受 `boolean \| string[]`，string[] 为按名允许清单） | 一致 |
+
+**trivium 能力面（client.trivium.\*）**
+
+| 调用（Timelines） | DTO（shared-types/trivium.ts） | 结论 |
+| --- | --- | --- |
+| `bulkUpsert({database, items:[{externalId, namespace, vector, payload}]})` | `TriviumBulkUpsertItem = TriviumNodeReference{id?,externalId?,namespace?} + {vector, payload}` | 一致 |
+| 取 `resp.items[].{externalId, id}` 供 `indexText` | `TriviumBulkUpsertResponseItem{index,id,action,externalId,namespace}` | 一致 |
+| `bulkDelete({database, items:[{externalId}]})` | `TriviumNodeReference[]` | 一致 |
+| `bulkLink({database, items:[{src:{externalId},dst:{externalId},label,weight}]})` | `TriviumBulkLinkItem` | 一致 |
+| `searchHybrid({database, vector, queryText, topK, hybridAlpha, payloadFilter})` | `TriviumSearchHybridRequest`（全字段同名）→ `TriviumSearchHit[] {id, externalId?, score, payload}` | 一致 |
+| `indexText({database, id, text})` / `createIndex({database, field})` / `flush({database})` | `TriviumIndexTextRequest` / `TriviumCreateIndexRequest` / `TriviumFlushRequest`（均 extends `TriviumOpenOptions{database?}`） | 一致 |
+| `stat({database})` 取 `{nodeCount, edgeCount, vectorDim}` | `TriviumStatResponse` | 一致 |
+
+**sql 能力面（client.sql.\*，库 `main`，表 `index_state`）**
+
+| 调用 | DTO（shared-types/sql.ts） | 结论 |
+| --- | --- | --- |
+| `migrate({database, migrations:[{id, statement}]})` | `SqlMigrationInput{id, statement}` | 一致 |
+| `query({database, statement, params})` → `resp.rows` | `SqlQueryRequest` → `SqlQueryResult{rows: Record<string, SqlValue>[]}` | 一致 |
+| `batch({database, statements:[{statement, params}]})`（失败逐条 `exec` 兜底） | `SqlBatchRequest{statements: SqlStatementInput[]}` | 一致 |
+| `exec({database, statement, params})` | `SqlExecRequest` | 一致 |
+
+**派生投影边界（重申）**：向量索引 + `index_state` 状态表全部为原生 `message.extra` 的可重建投影；
+`private: true` 为整库私有（库名 `tl_vec_<dim>` 动态派生，故不能用 string[] 按名清单）。
+
+---
+

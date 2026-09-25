@@ -17,12 +17,19 @@ const INIT_RETRY_COOLDOWN_MS = 60_000;
 /** Timelines 在 Authority 侧的扩展身份（命名规范：third-party/<name>） */
 export const AUTHORITY_EXTENSION_ID = 'third-party/sillytavern-timelines';
 
-/** 最小权限声明：仅声明实际用到的能力，绝不声明 agent/fs/http */
+/**
+ * 最小权限声明（L1-MF-5）：只声明实际调用到的能力。
+ *
+ * 实际使用面（2026-09-25 对照 Authority 仓 shared-types 逐字段核验）：
+ *   - client.trivium.*：bulkUpsert / bulkDelete / bulkLink / searchHybrid /
+ *     indexText / createIndex / flush / stat（全部为 private 数据面）
+ *   - client.sql.*：migrate / query / batch / exec（index_state 状态表）
+ * 未使用的能力（storage.kv / jobs.background / fs / http / agent）一律不声明，
+ * 避免用户在 Security Center 授权弹窗看到多余风险项。
+ */
 export const AUTHORITY_DECLARED_PERMISSIONS = {
   trivium: { private: true },
   sql: { private: true },
-  storage: { kv: true },
-  jobs: { background: ['sql.backup', 'trivium.flush'] },
 };
 
 /** 合法状态集合 */
