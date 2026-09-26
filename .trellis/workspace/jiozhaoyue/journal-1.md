@@ -851,3 +851,39 @@ Phase 0 实机 E2E（Dev Luker 8003 + Authority，L1-MF-15 断言）8/8 全绿�
 ### Next Steps
 
 - 多树视图（跨角色/群组同屏）仍为未裁定大特性候选，待用户决策后按惯例出 design.md
+
+
+## Session 24: 多树视图实施：单画布跨角色/群组同屏 N 棵时间树（11/11 E2E + 168 单测）
+<!-- trellis-session: v=2 fp=4d2847f5acd90530 -->
+
+**Date**: 2026-09-26
+**Task**: 多树视图实施：单画布跨角色/群组同屏 N 棵时间树（11/11 E2E + 168 单测）
+**Branch**: `codex-luker-chinese-refactor`
+
+### Summary
+
+按已裁定设计（D1a/D2a/D3a/D4a/D5b）实施多树视图：src/multi-tree.js 纯函数五件套（命名空间化/预算/网格拼装/聚合/导航索引重定位）+ node-data scopeContext 参数 + index.js 编排与 UI（选择器/横幅/进度/退出）+ 语义构建护栏 + 跨树导航接线。单测 168/168（新增 21），E2E 扩至 11 步全绿（多树进入/≥2 树共存/0 跨树边/退出恢复单树）。实施中发现并修复：enterMultiTreeMode 树 id 派生用错 target 字段形状（两树同撞 char_unknown）；E2E 宿主 /chats 响应为扁平数组且消息数在 chat_items；单次 Runtime.evaluate 有 CDP 120s 上限需拆分轮询
+
+### Main Changes
+
+- 纯函数模块：scopeTreeElements 只重写 id 引用不污染导航字段（拓扑保持不变量单测）；resolveTreeCharacterIndex 解决 characters 数组运行中重排的导航正确性（avatar 优先、refId 回退）
+- 编排：multiTreeState 单例 + progressiveGeneration 代际失效 + lastContextKey ::multi 维度；语义护栏拒绝多树模式下构建（union 元素写入当前 namespace 会污染其他角色索引）
+- E2E 方法论沉淀：长流程必须拆小 evaluate + Node 侧 pollOnPage（CDP 单调用 120s 上限）；失败取证用 console.error/window error 钩子回读
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d7a6465` | feat(multi-tree): 多树视图（跨角色/群组同屏）实施——单画布 N 棵时间树 |
+
+### Testing
+
+- [OK] node --test tests/*.test.mjs 168/168；BASE_URL=https://127.0.0.1:8003 node tests/e2e/phase0-authority.mjs 11/11（Dev Luker 实机）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 跨树 dbltap 导航未 E2E 化（需 cy 实例引用，v1 覆盖缺口，核心逻辑已纯函数化单测）；树徽标配色可复用 generateUniqueColor 增强
