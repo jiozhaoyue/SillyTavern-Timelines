@@ -195,8 +195,11 @@ export async function prepareDataProgressive(data, isGroupChat, {
   onBatch = null,
   onProgress = null,
   memoryProfile = null,
+  scopeContext = null,
 } = {}) {
-  const context = getTimelinesContext();
+  // 多树视图（跨角色/群组同屏）为非当前树传入 scopeContext：
+  // scopeKey / 活跃会话 / 角色查找全部改用该作用域上下文，缓存不串 scope；缺省行为不变。
+  const context = scopeContext ?? getTimelinesContext();
   const emitBatch = typeof onBatch === 'function' ? onBatch : null;
   const emitProgress = typeof onProgress === 'function' ? onProgress : null;
   const chat_dict = {};

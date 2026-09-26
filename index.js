@@ -118,6 +118,15 @@ import { openAnalyticsModal } from './src/analytics-modal.js';
 import { openSnapshotGalleryModal } from './src/snapshot-modal.js';
 import { SearchRadar } from './src/search-radar.js';
 import { fetchData, prepareDataProgressive, getFullNodeText } from './src/node-data.js';
+import {
+  makeTreeId,
+  assertTreeBudget,
+  MAX_TREES_BY_PROFILE,
+  scopeTreeElements,
+  composeMultiTreePositions,
+  buildMultiTreeElements,
+  resolveTreeCharacterIndex,
+} from './src/multi-tree.js';
 import { highlightElements, restoreElements, setupStylesAndData } from './src/style.js';
 import { closeModal, closeOpenDrawers, closeTippy, handleModalDisplay, navigateToMessage, copyTextToClipboard } from './src/utils.js';
 
@@ -181,6 +190,9 @@ let activeMemoryProfile = null; // 当前会话的设备画像（省内存档位
 let progressiveGeneration = 0;  // 渐进加载代际守卫（防止旧管线补丁写入新画布）
 let expandedClusterIds = new Set(); // 用户手动展开的 LOD 折叠段落
 let isLodCollapsedActive = true; // 抽稀折叠是否处于激活态
+// 多树视图模式状态（L1-MF-12：收敛于单例，禁止散落布尔）
+// { active, targets: [{kind:'char'|'group', refId, name, avatar}], trees: [{treeId, kind, refId, name, avatar}] }
+let multiTreeState = null;
 
 let layout = {}; // Cytoscape 图布局配置；稍后由 `updateTimelineDataIfNeeded` 填充
 let hasRegisteredContextInvalidators = false;
@@ -260,6 +272,8 @@ let autoSemanticBuildRunner = null; // init 闭包注入的静默增量构建（
  */
 async function maybeAutoSemanticIndex() {
   const settings = getTimelineSettings();
+  // 多树模式护栏：画布元素为多树并集，写入当前 namespace 会污染其他角色的语义索引（design.md §3.5/R4）
+  if (multiTreeState?.active) return;
   if (!settings.semanticAutoIndex) return;
   if (!settings.semanticSearchEnabled) return;
   if (getAuthorityStatus().status !== 'ready') return;
@@ -870,15 +884,18 @@ function makeTapTippy(ele) {
           navigateBtn.textContent = sessionName;
           navigateBtn.title = `Find and open this message in "${sessionName}".`; // TODO: data-i18n?
           navigateBtn.addEventListener('click', function () {
-            if (ele.data('isSwipe')) {
-              navigateToMessage(file_name, messageId, ele.data('swipeId'));
-            } else {
-              navigateToMessage(file_name, messageId);
-            }
-            closeModal();
-            tip.hide(); // Hide this full info panel
-            resetLegendHighlight(theCy); // Reset the legend highlight state
-            restoreElements(theCy); // Remove remaining highlights, if any (from text search)
+            prepareMultiTreeNavigation(ele).then(ok => {
+              if (!ok) return;
+              if (ele.data('isSwipe')) {
+                navigateToMessage(file_name, messageId, ele.data('swipeId'));
+              } else {
+                navigateToMessage(file_name, messageId);
+              }
+              closeModal();
+              tip.hide(); // Hide this full info panel
+              resetLegendHighlight(theCy); // Reset the legend highlight state
+              restoreElements(theCy); // Remove remaining highlights, if any (from text search)
+            });
           });
           // Without creating a branch, swipes are available only at the last message of a chat.
           if (isSwipe && !isLastMessage) {
@@ -895,12 +912,15 @@ function makeTapTippy(ele) {
           branchBtn.classList.add('widthNatural');
           branchBtn.title = `Create a new branch from "${sessionName}", at this message, and open it.`; // TODO: data-i18n?
           branchBtn.addEventListener('click', function () {
-            if (ele.data('isSwipe')) navigateToMessage(file_name, messageId, ele.data('swipeId'), true);
-            else navigateToMessage(file_name, messageId, null, true);
-            closeModal();
-            tip.hide(); // Hide this full info panel
-            resetLegendHighlight(theCy); // Reset the legend highlight state
-            restoreElements(theCy); // Remove remaining highlights, if any (from text search)
+            prepareMultiTreeNavigation(ele).then(ok => {
+              if (!ok) return;
+              if (ele.data('isSwipe')) navigateToMessage(file_name, messageId, ele.data('swipeId'), true);
+              else navigateToMessage(file_name, messageId, null, true);
+              closeModal();
+              tip.hide(); // Hide this full info panel
+              resetLegendHighlight(theCy); // Reset the legend highlight state
+              restoreElements(theCy); // Remove remaining highlights, if any (from text search)
+            });
           });
           btnContainer.appendChild(branchBtn);
 
@@ -1697,6 +1717,13 @@ function setupEventHandlers(cy, nodeData) {
     };
   }
 
+  let multiTreeBtn = modal.getElementsByClassName('multi-tree-btn')[0];
+  if (multiTreeBtn) {
+    multiTreeBtn.onclick = function () {
+      openMultiTreeSelector();
+    };
+  }
+
   let outlineBtn = modal.getElementsByClassName('toggle-story-outline')[0];
   if (outlineBtn) {
     outlineBtn.onclick = function () {
@@ -1879,7 +1906,7 @@ function setupEventHandlers(cy, nodeData) {
   });
 
   // Double-tap a node to DWIM: find first matching message and navigate to it if possible, create a branch if absolutely necessary
-  cy.on('dbltap', 'node', function (evt) {
+  cy.on('dbltap', 'node', async function (evt) {
     const node = evt.target;
 
     // Auto-pick first chat file that has this message
@@ -1897,6 +1924,10 @@ function setupEventHandlers(cy, nodeData) {
     if (chat_sessions.length > 1) {
       toastr.info(`找到多个匹配项，已自动选择 "${file_name}"`);
     }
+
+    // 多树模式：跨树节点先选中其归属角色（群组树受 v1 限制），再走原导航
+    const navAllowed = await prepareMultiTreeNavigation(node);
+    if (!navAllowed) return;
 
     if (node.data('isSwipe')) {
       // NOTE: This will automatically create a branch if the swipe is on a non-last message.
@@ -2303,6 +2334,11 @@ async function onTimelineButtonClick(forceReload = false) {
     return;
   }
 
+  // 多树模式下点击时间线按钮：按已保存的目标集重建多树视图（而非落入单树管线）
+  if (multiTreeState?.active && Array.isArray(multiTreeState.targets)) {
+    return enterMultiTreeMode(multiTreeState.targets);
+  }
+
   const context = getTimelinesContext();
   const contextKey = makeContextKey(context);
   const needsUpdate = forceReload || lastContextKey !== contextKey;
@@ -2422,6 +2458,274 @@ async function onTimelineButtonClick(forceReload = false) {
  * @param {Array} [nodeData=lastTimelineData] - 原始时间线数据
  * @param {boolean} [fit=false] - 是否重置缩放以适应窗口
  */
+// ==================== 多树视图（跨角色/群组同屏，design.md 09-26-multi-tree-view-design） ====================
+
+/**
+ * 多树模式下导航前的前置处理：
+ * - 角色树且非当前上下文 → selectCharacterById 选中该角色（跨角色跳转的关键，
+ *   宿主 openCharacterChat 只对当前已选中角色生效——2026-09-26 E2E 取证）；
+ * - 群组树仅当当前上下文即该群组时可跳（v1 限制，上游 navigateToMessage 群聊 TODO 同源）；
+ * - 单树模式或无 treeId → 原逻辑不受影响。
+ *
+ * @param {object} node - Cytoscape 节点（jQuery 包装或 cy 集合，需支持 .data()）。
+ * @returns {Promise<boolean>} 是否允许继续执行 navigateToMessage。
+ */
+async function prepareMultiTreeNavigation(node) {
+  const treeId = typeof node?.data === 'function' ? node.data('treeId') : node?.data?.()?.treeId;
+  if (!multiTreeState?.active || !treeId) return true;
+  const tree = multiTreeState.trees.find(t => t.treeId === treeId);
+  if (!tree) return true;
+  const ctx = getTimelinesContext();
+  if (tree.kind === 'group') {
+    if (String(ctx?.groupId) !== String(tree.refId)) {
+      toastr.info(`多树模式：「${tree.name}」为群组树，节点跳转仅支持当前群组上下文（v1 限制）。`);
+      return false;
+    }
+    return true;
+  }
+  if (String(ctx?.characterId) === String(tree.refId)) return true;
+  // characters 数组运行中可能重排（实机取证），优先用稳定标识 avatar 重新定位索引
+  const idx = resolveTreeCharacterIndex(multiTreeState.trees, treeId, ctx?.characters);
+  if (idx == null) {
+    toastr.warning('多树模式：无法定位该树对应角色的当前索引。');
+    return false;
+  }
+  if (typeof ctx?.selectCharacterById !== 'function') {
+    toastr.warning('当前宿主未暴露 selectCharacterById，无法跨树跳转。');
+    return false;
+  }
+  await ctx.selectCharacterById(idx);
+  for (let i = 0; i < 10 && ctx?.chatId == null; i++) {
+    await new Promise(r => setTimeout(r, 300));
+  }
+  return true;
+}
+
+/**
+ * 打开多树目标选择器（JS 动态模态，export-history-modal 同款模式）。
+ * 目标 = 有会话的角色 + 有会话的群组；默认勾选当前上下文；预算内限制勾选数（D1a/D5b）。
+ */
+function openMultiTreeSelector() {
+  const ctx = getTimelinesContext();
+  if (!ctx) return;
+  closeOpenDrawers();
+  document.getElementById('timelines-multitree-selector')?.remove();
+
+  const profile = activeMemoryProfile?.memorySaver ? 'mobile' : 'desktop';
+  const budget = assertTreeBudget({ treeCount: 1, profile }); // 借用取 max
+  const maxTrees = budget.max;
+  const currentTreeId = makeTreeId({ characterId: ctx.characterId, groupId: ctx.groupId });
+
+  const charTargets = (ctx.characters ?? [])
+    .map((c, i) => ({ kind: 'char', refId: String(i), name: c?.name ?? `角色${i}`, avatar: c?.avatar ?? null, chat: c?.chat ?? null, sub: String(c?.chat_size ?? '') }))
+    .filter(c => c.chat)
+    .map(t => ({ ...t, treeId: makeTreeId({ characterId: t.refId }) }));
+  const groupTargets = (ctx.groups ?? [])
+    .filter(g => Array.isArray(g?.chats) && g.chats.length > 0)
+    .map(g => ({ kind: 'group', refId: String(g.id), name: g?.name ?? `群组${g.id}`, avatar: null, chat: g.chats[0], sub: `${g.chats.length} 会话`, treeId: makeTreeId({ groupId: String(g.id) }) }));
+  const allTargets = [...charTargets, ...groupTargets];
+  if (!allTargets.length) {
+    toastr.info('没有检测到带会话的角色或群组，无树可选。');
+    return;
+  }
+
+  const backdrop = document.createElement('div');
+  backdrop.id = 'timelines-multitree-selector';
+  backdrop.className = 'timelines-multitree-backdrop';
+  backdrop.innerHTML = `
+    <div class="timelines-multitree-panel">
+      <div class="timelines-multitree-header">
+        <h3><i class="fa-solid fa-object-group"></i> 多树视图 · 选择同屏目标</h3>
+        <span class="timelines-multitree-budget">同屏上限 ${maxTrees} 棵（${profile === 'mobile' ? '省内存档位' : '桌面档位'}）</span>
+        <button class="menu_button timelines-multitree-close-btn">✕</button>
+      </div>
+      <div class="timelines-multitree-body">
+        ${allTargets.map((t, i) => `
+          <label class="timelines-multitree-row" data-idx="${i}">
+            <input type="checkbox" data-idx="${i}" ${t.treeId === currentTreeId ? 'checked' : ''} />
+            <span class="timelines-multitree-name">${escapeHtml(t.name)}</span>
+            <span class="timelines-multitree-sub">${t.kind === 'group' ? '群组 · ' : ''}${escapeHtml(t.sub || t.chat || '')}</span>
+          </label>`).join('')}
+      </div>
+      <div class="timelines-multitree-footer">
+        <button class="menu_button timelines-multitree-confirm-btn"><i class="fa-solid fa-check"></i> 同屏渲染所选树</button>
+      </div>
+    </div>`;
+  document.body.appendChild(backdrop);
+
+  const close = () => backdrop.remove();
+  backdrop.querySelector('.timelines-multitree-close-btn').addEventListener('click', close);
+  backdrop.addEventListener('click', e => { if (e.target === backdrop) close(); });
+
+  const checkboxes = [...backdrop.querySelectorAll('input[type=checkbox]')];
+  const enforceBudget = changed => {
+    const checked = checkboxes.filter(cb => cb.checked);
+    if (checked.length > maxTrees) {
+      changed.checked = false;
+      toastr.info(`同屏树数上限为 ${maxTrees}（当前档位 ${profile}）。`);
+    }
+  };
+  checkboxes.forEach(cb => cb.addEventListener('change', () => enforceBudget(cb)));
+
+  backdrop.querySelector('.timelines-multitree-confirm-btn').addEventListener('click', () => {
+    const targets = checkboxes.filter(cb => cb.checked).map(cb => allTargets[Number(cb.dataset.idx)]);
+    if (!targets.length) { toastr.warning('请至少选择一棵树。'); return; }
+    close();
+    enterMultiTreeMode(targets);
+  });
+}
+
+/**
+ * 进入多树模式：逐树取数（scopeContext 隔离缓存 scope）→ 作用域化 → Worker 布局 → 网格拼装 → 单 cy 渲染。
+ *
+ * @param {Array<{kind: 'char'|'group', refId: string, name: string, avatar: string|null}>} targets
+ */
+async function enterMultiTreeMode(targets) {
+  const context = getTimelinesContext();
+  if (!context) return;
+  const profile = activeMemoryProfile?.memorySaver ? 'mobile' : 'desktop';
+  const budget = assertTreeBudget({ treeCount: targets.length, profile });
+  if (!budget.ok) {
+    toastr.warning(`多树视图：同屏树数超限（上限 ${budget.max}，当前档位 ${profile}）。`);
+    return;
+  }
+
+  const memoryProfile = ensureMemoryProfile();
+  const myGeneration = ++progressiveGeneration; // 失效可能仍在途的单树渐进管线补丁
+  showMultiTreeProgress(`多树构建中 0/${targets.length}`);
+
+  const trees = [];
+  const scopedTrees = [];
+  const treeLayouts = [];
+  const layoutOpts = {
+    ...layout,
+    nodeWidth: extension_settings.timeline.nodeWidth,
+    nodeHeight: extension_settings.timeline.nodeHeight,
+  };
+
+  try {
+    for (let i = 0; i < targets.length; i++) {
+      const target = targets[i];
+      if (myGeneration !== progressiveGeneration) return; // 期间用户触发了新的重建，本次作废
+      showMultiTreeProgress(`多树构建中 ${i + 1}/${targets.length}：${target.name}`);
+      // target 形状为 {kind, refId}（选择器产出）；treeId 已预算则复用，否则按 kind 派生
+      const treeId = target.treeId ?? makeTreeId(target.kind === 'group' ? { groupId: target.refId } : { characterId: target.refId });
+      let data = {};
+      let isGroup = target.kind === 'group';
+      if (isGroup) {
+        const group = (context.groups ?? []).find(g => String(g.id) === String(target.refId));
+        if (!group?.chats?.length) continue;
+        group.chats.forEach((chatName, gi) => { data[gi] = { file_name: chatName }; });
+      } else {
+        const character = context.characters?.[target.refId];
+        if (!character) continue;
+        data = await fetchData(character.avatar);
+      }
+      const scopeContext = {
+        characterId: isGroup ? null : String(target.refId),
+        groupId: isGroup ? String(target.refId) : null,
+        chatId: null,
+        chatMetadata: null,
+        chat: null,
+        characters: context.characters,
+        groups: context.groups,
+      };
+      const rawElements = await prepareDataProgressive(data, isGroup, {
+        concurrency: memoryProfile.fetchConcurrency,
+        memoryProfile,
+        scopeContext,
+      });
+      if (!Array.isArray(rawElements) || rawElements.length === 0) continue;
+      const scoped = scopeTreeElements(rawElements, treeId);
+      trees.push({ treeId, kind: target.kind, refId: String(target.refId), name: target.name, avatar: target.avatar ?? null });
+      scopedTrees.push(scoped);
+    }
+
+    if (!scopedTrees.length) {
+      toastr.warning('多树视图：所选目标均无可渲染的会话数据。');
+      return;
+    }
+
+    // 逐树布局：同一 LayoutService（Worker 内排队；失败回退 null，由拼装层置零）
+    for (const scoped of scopedTrees) {
+      let positions = null;
+      try {
+        const res = await layoutService.computeLayout(scoped, layoutOpts);
+        if (res?.success && res.positions) positions = res.positions;
+      } catch (err) {
+        console.warn('Timelines 多树：该树布局失败，按原位拼装：', err);
+      }
+      treeLayouts.push(positions);
+    }
+    const composed = composeMultiTreePositions(
+      trees.map((t, i) => ({ treeId: t.treeId, positions: treeLayouts[i] })),
+      { columns: trees.length > 1 ? 2 : 1, gap: 120 },
+    );
+    const allElements = buildMultiTreeElements(scopedTrees);
+
+    multiTreeState = { active: true, targets, trees };
+    expandedClusterIds.clear();
+    lastTimelineData = allElements;
+    lastContextKey = `${makeContextKey(context)}::multi`;
+
+    renderCytoscapeDiagram(allElements, {
+      name: 'preset',
+      positions: node => composed.positions[node.id()] ?? { x: 0, y: 0 },
+      fit: true,
+      padding: 60,
+    });
+    toggleSwipes(theCy, extension_settings.timeline.autoExpandSwipes);
+    showMultiTreeBanner(trees);
+  } catch (err) {
+    console.error('Timelines 多树视图构建失败：', err);
+    toastr.error(`多树视图构建失败: ${err?.message ?? err}`);
+  } finally {
+    if (myGeneration === progressiveGeneration) removeMultiTreeProgress();
+  }
+}
+
+/** 退出多树模式：清状态与横幅，强制走单树管线重建。 */
+function exitMultiTreeMode() {
+  multiTreeState = null;
+  removeMultiTreeBanner();
+  onTimelineButtonClick(true);
+}
+
+function showMultiTreeProgress(text) {
+  let el = document.getElementById('timelines-multitree-progress');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'timelines-multitree-progress';
+    el.className = 'timelines-multitree-progress';
+    const host = document.getElementById('timelinesDiagramDiv') ?? document.body;
+    host.appendChild(el);
+  }
+  el.textContent = text;
+}
+
+function removeMultiTreeProgress() {
+  document.getElementById('timelines-multitree-progress')?.remove();
+}
+
+function showMultiTreeBanner(trees) {
+  removeMultiTreeBanner();
+  const host = document.getElementById('timelinesDiagramDiv');
+  if (!host) return;
+  const banner = document.createElement('div');
+  banner.id = 'timelines-multitree-banner';
+  banner.className = 'timelines-multitree-banner';
+  banner.innerHTML = `
+    <span class="timelines-multitree-banner-title"><i class="fa-solid fa-object-group"></i> 多树模式（${trees.length} 棵）</span>
+    ${trees.map(t => `<span class="timelines-multitree-badge" data-tree-id="${escapeHtml(t.treeId)}">${t.kind === 'group' ? '👥' : '📦'} ${escapeHtml(t.name)}</span>`).join('')}
+    <button class="menu_button timelines-multitree-exit-btn" title="退出多树模式，恢复单树视图">退出多树</button>`;
+  banner.querySelector('.timelines-multitree-exit-btn').addEventListener('click', exitMultiTreeMode);
+  host.appendChild(banner);
+}
+
+function removeMultiTreeBanner() {
+  document.getElementById('timelines-multitree-banner')?.remove();
+}
+
 async function refreshDiagram(nodeData = lastTimelineData, fit = false) {
   if (!Array.isArray(nodeData) || nodeData.length === 0) {
     return;
@@ -2673,6 +2977,11 @@ jQuery(async () => {
 
   async function triggerSemanticBuild(forceRebuild, { silent = false } = {}) {
     const settings = getTimelineSettings();
+    // 多树模式护栏：手动路径给提示，自动路径已在 maybeAutoSemanticIndex 静默拦截
+    if (multiTreeState?.active) {
+      if (!silent) toastr.warning('多树模式下不进行语义索引构建（画布为多树并集，无法归属单一 namespace），请先退出多树视图。');
+      return;
+    }
     if (!settings.semanticSearchEnabled) {
       if (!silent) toastr.warning('请先启用语义检索（并确认已安装 Authority 服务端插件）。');
       return;

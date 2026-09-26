@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/luker-plugin-standards.md", "reason": "宿主插件规范：最小权限/纯前端降级/样式作用域"}
+{"file": ".trellis/spec/frontend/optional-integration.md", "reason": "可选集成状态机与宿主可用性纪律（A4/语义护栏相关）"}

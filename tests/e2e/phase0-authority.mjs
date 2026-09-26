@@ -459,6 +459,107 @@ async function main() {
     await screenshot(cdp, 'phase0_05_export_history');
     await cdpEvaluate(cdp, `document.querySelector('.timelines-export-history-modal .export-history-close-btn')?.click();`, false);
 
+    // ---- 步骤 11：多树视图全链路（进入 → ≥2 树共存 → 无跨树边 → 退出恢复单树） ----
+    // UI 驱动：工具栏多树按钮 → 选择器 → 勾选当前角色 + 一个确认有消息量的其他角色 → 确认渲染 → 断言 → 退出
+    // 预筛第二目标：用页面内 /api/characters/chats 确认该角色确有消息（避免空会话树导致只有一棵树可渲染）
+    const secondTarget = await cdpEvaluate(cdp, `(async () => {
+      const ctx = window.Luker?.getContext?.() ?? window.SillyTavern?.getContext?.();
+      const cur = ctx.characterId;
+      const candidates = (ctx.characters ?? [])
+        .map((c, i) => ({ i, avatar: c?.avatar, name: c?.name, chat: c?.chat }))
+        .filter(c => c.chat && String(c.i) !== String(cur));
+      for (const c of candidates) {
+        try {
+          const data = await fetch('/api/characters/chats', {
+            method: 'POST',
+            body: JSON.stringify({ avatar_url: c.avatar }),
+            headers: ctx.getRequestHeaders(),
+          }).then(r => r.json());
+          // 响应为扁平数组，消息数在 chat_items（无 messages 字段——消息逐文件拉取）
+          const list = Array.isArray(data) ? data : Object.values(data ?? {});
+          const total = list.reduce((s, ch) => s + (Number(ch?.chat_items ?? ch?.chat_size) || (Array.isArray(ch?.messages) ? ch.messages.length : 0)), 0);
+          if (total > 0) return { name: c.name, messages: total };
+        } catch { /* 下一个候选 */ }
+      }
+      return null;
+    })()`);
+    let multiResult = { skipped: true, reason: 'no-second-target-with-messages' };
+    if (secondTarget) {
+      // 错误捕获：enterMultiTreeMode 失败时经 toastr/console.error 静默吞掉，这里留证据
+      await cdpEvaluate(cdp, `(() => {
+        window.__mtErrors = [];
+        window.addEventListener('error', e => window.__mtErrors.push('window: ' + String(e?.message ?? e).slice(0, 220)));
+        const orig = console.error.bind(console);
+        console.error = (...a) => { window.__mtErrors.push(a.map(String).join(' ').slice(0, 260)); orig(...a); };
+        return 'mt-error-hooked';
+      })()`, false);
+      // 分阶段小 evaluate（单次 Runtime.evaluate 有 CDP 120s 上限，长等待放 Node 侧轮询）
+      const openResult = await cdpEvaluate(cdp, `(async () => {
+        document.querySelector('.multi-tree-btn')?.click();
+        for (let i = 0; i < 10; i++) { await new Promise(r => setTimeout(r, 500)); if (document.getElementById('timelines-multitree-selector')) break; }
+        const selector = document.getElementById('timelines-multitree-selector');
+        if (!selector) return { error: 'selector-not-opened' };
+        const rows = [...selector.querySelectorAll('.timelines-multitree-row')];
+        const wanted = [${JSON.stringify(secondTarget.name)}];
+        let checkedCount = 0;
+        for (const row of rows) {
+          const name = row.querySelector('.timelines-multitree-name')?.textContent ?? '';
+          const cb = row.querySelector('input[type=checkbox]');
+          if (!cb) continue;
+          if (cb.checked) { checkedCount++; continue; } // 当前角色默认勾选
+          if (wanted.some(w => name === w || name.startsWith(w)) && checkedCount < 4) {
+            cb.checked = true; cb.dispatchEvent(new Event('change', { bubbles: true }));
+            if (cb.checked) checkedCount++;
+          }
+        }
+        if (checkedCount < 2) return { error: 'not-enough-targets-checked', checkedCount };
+        selector.querySelector('.timelines-multitree-confirm-btn')?.click();
+        return { checkedCount };
+      })()`);
+      // 等多树构建完成（横幅出现，Node 侧轮询不受 CDP 单调用超时约束）
+      let bannerShown = false;
+      try {
+        await pollOnPage(cdp, `!!document.getElementById('timelines-multitree-banner')`, { timeoutMs: 180000, intervalMs: 1500, label: '多树横幅出现' });
+        bannerShown = true;
+      } catch { bannerShown = false; }
+      if (!bannerShown) {
+        const mtErrors = await cdpEvaluate(cdp, `window.__mtErrors ?? []`, false).catch(() => []);
+        multiResult = { error: 'multi-banner-timeout', openResult, mtErrors };
+      } else {
+        const assertions = await cdpEvaluate(cdp, `(() => {
+          const banner = document.getElementById('timelines-multitree-banner');
+          const tree = window.TimelinesExtensionApi?.getTimelineTree?.() ?? [];
+          const treeIds = [...new Set(tree.map(el => el?.data?.treeId).filter(Boolean))];
+          let crossTreeEdges = 0;
+          for (const el of tree) {
+            if (el?.group !== 'edges') continue;
+            const sp = String(el.data.source ?? '').split('::')[0];
+            const tp = String(el.data.target ?? '').split('::')[0];
+            if (sp !== tp) crossTreeEdges++;
+          }
+          return {
+            badgeCount: banner?.querySelectorAll('.timelines-multitree-badge').length ?? 0,
+            elementCount: tree.length, treeIds, crossTreeEdges,
+          };
+        })()`, false);
+        // 退出并等单树恢复
+        await cdpEvaluate(cdp, `document.getElementById('timelines-multitree-banner')?.querySelector('.timelines-multitree-exit-btn')?.click();`, false);
+        let restored = false;
+        try {
+          await pollOnPage(cdp, `(() => {
+            const tree2 = window.TimelinesExtensionApi?.getTimelineTree?.() ?? [];
+            return !document.getElementById('timelines-multitree-banner') && tree2.length > 0 && tree2.every(el => !el?.data?.treeId);
+          })()`, { timeoutMs: 120000, intervalMs: 1500, label: '退出恢复单树' });
+          restored = true;
+        } catch { restored = false; }
+        multiResult = { openResult, ...assertions, restored };
+      }
+    }
+    const multiOk = multiResult?.badgeCount >= 2 && multiResult?.crossTreeEdges === 0 && multiResult?.restored === true;
+    record('多树视图全链路（进入→≥2 树共存→无跨树边→退出恢复单树）', multiOk,
+      `second=${JSON.stringify(secondTarget)} result=${JSON.stringify(multiResult).slice(0, 300)}`);
+    await screenshot(cdp, 'phase0_06_multi_tree_exit');
+
     // ---- 汇总 ----
     const summary = { baseUrl: BASE_URL, at: new Date().toISOString(), results };
     mkdirSync(ARTIFACTS_DIR, { recursive: true });

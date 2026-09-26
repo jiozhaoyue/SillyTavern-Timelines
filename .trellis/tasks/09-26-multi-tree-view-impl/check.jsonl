@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "检查侧规范：多树新增模块须满足的纯函数/单测/零回归基线"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "跨层数据流检查：编排层/数据面/纯函数模块联动核对"}

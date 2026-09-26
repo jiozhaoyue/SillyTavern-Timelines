@@ -3358,3 +3358,140 @@
   display: flex;
   gap: 6px;
 }
+
+/* ==================== 多树视图（timelines-multitree-*，L0-10：前缀命名空间 + 宿主变量回退） ==================== */
+
+.timelines-multitree-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10010;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.timelines-multitree-panel {
+  background: var(--SmartThemeBodyBackgroundColor, var(--SmartThemeBlurTintColor, #1b1b1b));
+  color: var(--SmartThemeBodyColor, #ddd);
+  border: 1px solid var(--SmartThemeBorderColor, #444);
+  border-radius: 10px;
+  width: min(560px, 92vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+.timelines-multitree-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--SmartThemeBorderColor, #444);
+}
+
+.timelines-multitree-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  flex: 1;
+}
+
+.timelines-multitree-budget {
+  font-size: 0.78rem;
+  opacity: 0.75;
+}
+
+.timelines-multitree-body {
+  overflow-y: auto;
+  padding: 8px 14px;
+  flex: 1;
+}
+
+.timelines-multitree-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.timelines-multitree-row:hover {
+  background: var(--SmartThemeHoverBorderColor, rgba(255, 255, 255, 0.08));
+}
+
+.timelines-multitree-name {
+  font-weight: 600;
+  flex-shrink: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timelines-multitree-sub {
+  font-size: 0.8rem;
+  opacity: 0.65;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timelines-multitree-footer {
+  padding: 10px 14px;
+  border-top: 1px solid var(--SmartThemeBorderColor, #444);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.timelines-multitree-banner {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: var(--SmartThemeBlurTintColor, rgba(20, 20, 20, 0.85));
+  border: 1px solid var(--SmartThemeBorderColor, #555);
+  color: var(--SmartThemeBodyColor, #ddd);
+  font-size: 0.82rem;
+  max-width: 92%;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.timelines-multitree-banner-title {
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.timelines-multitree-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--SmartThemeMediumFadedColor, rgba(255, 255, 255, 0.12));
+  border: 1px solid var(--SmartThemeBorderColor, #666);
+  flex-shrink: 0;
+}
+
+.timelines-multitree-exit-btn {
+  flex-shrink: 0;
+}
+
+.timelines-multitree-progress {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: var(--SmartThemeBlurTintColor, rgba(20, 20, 20, 0.85));
+  border: 1px solid var(--SmartThemeBorderColor, #555);
+  color: var(--SmartThemeBodyColor, #ddd);
+  font-size: 0.85rem;
+}
